@@ -118,7 +118,7 @@ def draw_cells():
 
 # Main Class
 if __name__ == '__main__':
-    path = "./libraries/Nangate/NangateOpenCellLibrary.lef"
+    path = "./lib/Free45ForParserOnly.lef"
     lef_parser = LefParser(path)
     lef_parser.parse()
 

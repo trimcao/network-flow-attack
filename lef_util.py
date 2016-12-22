@@ -3,6 +3,8 @@ Data Structures for LEF Parser
 Author: Tri Minh Cao
 Email: tricao@utdallas.edu
 Date: August 2016
+
+New version, updated Decemeber 2016.
 """
 from util import *
 
@@ -63,6 +65,15 @@ class Macro(Statement):
         self.info = {}
         # pin dictionary
         self.pin_dict = {}
+        self.class_name = None
+        self.origin = None
+        self.foreign = None
+        self.symmetry = None
+        self.site = None
+        self.size = None
+        self.pins = []
+        self.obs = None
+
 
     def __str__(self):
         """
@@ -90,23 +101,30 @@ class Macro(Statement):
         """
         if data[0] == "CLASS":
             self.info["CLASS"] = data[1]
+            self.class_name = data[1]
         elif data[0] == "ORIGIN":
             x_cor = float(data[1])
             y_cor = float(data[2])
             self.info["ORIGIN"] = (x_cor, y_cor)
+            self.origin = (x_cor, y_cor)
         elif data[0] == "FOREIGN":
             self.info["FOREIGN"] = data[1:]
+            self.foreign = data[1:]
         elif data[0] == "SIZE":
             width = float(data[1])
             height = float(data[3])
             self.info["SIZE"] = (width, height)
+            self.size = (width, height)
         elif data[0] == "SYMMETRY":
             self.info["SYMMETRY"] = data[1:]
+            self.symmetry = data[1:]
         elif data[0] == "SITE":
             self.info["SITE"] = data[1]
+            self.site = data[1]
         elif data[0] == "PIN":
             new_pin = Pin(data[1])
             self.pin_dict[data[1]] = new_pin
+            self.pins.append(new_pin)
             if "PIN" in self.info:
                 self.info["PIN"].append(new_pin)
             else:
@@ -115,6 +133,7 @@ class Macro(Statement):
         elif data[0] == "OBS":
             new_obs = Obs()
             self.info["OBS"] = new_obs
+            self.obs = new_obs
             return new_obs
         elif data[0] == "END":
             if data[1] == self.name:
@@ -137,6 +156,10 @@ class Pin(Statement):
         self.type = "PIN"
         self.name = name
         self.info = {}
+        self.direction = None
+        self.use = None
+        self.port = None
+        self.shape = None
 
     def __str__(self):
         s = ""
@@ -147,14 +170,18 @@ class Pin(Statement):
     def parse_next(self, data):
         if data[0] == "DIRECTION":
             self.info["DIRECTION"] = data[1]
+            self.direction = data[1]
         elif data[0] == "USE":
             self.info["USE"] = data[1]
+            self.use = data[1]
         elif data[0] == "PORT":
             new_port = Port()
             self.info["PORT"] = new_port
+            self.port = new_port
             return new_port
         elif data[0] == "SHAPE":
             self.info["SHAPE"] = data[1]
+            self.shape = data[1]
         elif data[0] == "END":
             if data[1] == self.name:
                 return 1
@@ -164,10 +191,10 @@ class Pin(Statement):
         return 0
 
     def is_lower_metal(self, split_layer):
-        return self.info["PORT"].is_lower_metal(split_layer)
+        return self.port.is_lower_metal(split_layer)
 
     def get_top_metal(self):
-        return self.info["PORT"].get_top_metal()
+        return self.port.get_top_metal()
 
 
 class Port(Statement):
@@ -181,6 +208,7 @@ class Port(Statement):
         self.type = "PORT"
         self.name = ""
         self.info = {}
+        self.layer = []
 
     def parse_next(self, data):
         if data[0] == "END":
@@ -188,6 +216,7 @@ class Port(Statement):
         elif data[0] == "LAYER":
             name = data[1]
             new_layerdef = LayerDef(data[1])
+            self.layer.append(new_layerdef)
             if "LAYER" in self.info:
                 self.info["LAYER"].append(new_layerdef)
             else:
@@ -195,13 +224,15 @@ class Port(Statement):
         elif data[0] == "RECT":
             # error if the self.info["LAYER"] does not exist
             self.info["LAYER"][-1].add_rect(data)
+            self.layer[-1].add_rect(data)
         elif data[0] == "POLYGON":
             self.info["LAYER"][-1].add_polygon(data)
+            self.layer[-1].add_polygon(data)
         return 0
 
     def is_lower_metal(self, split_layer):
         lower = True
-        for layer in self.info["LAYER"]:
+        for layer in self.layer:
             if compare_metal(layer.name, split_layer) >= 0:
                 lower = False
                 break
@@ -209,7 +240,7 @@ class Port(Statement):
 
     def get_top_metal(self):
         highest = "poly"
-        for layer in self.info["LAYER"]:
+        for layer in self.layer:
             if compare_metal(layer.name, highest) > 0:
                 highest = layer.name
         return highest
@@ -228,10 +259,12 @@ class Obs(Statement):
         self.type = "OBS"
         self.name = ""
         self.info = {}
+        self.layer = []
+
 
     def __str__(self):
         s = ""
-        for layer in self.info["LAYER"]:
+        for layer in self.layer:
             s += layer.type + " " + layer.name + "\n"
         return s
 
@@ -241,6 +274,7 @@ class Obs(Statement):
         elif data[0] == "LAYER":
             name = data[1]
             new_layerdef = LayerDef(data[1])
+            self.layer.append(new_layerdef)
             if "LAYER" in self.info:
                 self.info["LAYER"].append(new_layerdef)
             else:
@@ -248,8 +282,10 @@ class Obs(Statement):
         elif data[0] == "RECT":
             # error if the self.info["LAYER"] does not exist
             self.info["LAYER"][-1].add_rect(data) # [-1] means the latest layer
+            self.layer[-1].add_rect(data)
         elif data[0] == "POLYGON":
             self.info["LAYER"][-1].add_polygon(data)
+            self.layer[-1].add_polygon(data)
         return 0
 
 
