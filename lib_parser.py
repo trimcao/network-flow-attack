@@ -8,12 +8,6 @@ Date: December 2016
 from lib_util import *
 import util
 
-"""
-Questions:
-- Can you assign parent section and child section? For example: the pin section
-inside a cell section. The answer should be yes, we can just get the parent section
-from the stack. It will be the parent.
-"""
 
 class LibParser:
     """
@@ -24,10 +18,6 @@ class LibParser:
         self.file_path = lib_file
         # stack to store the ongoing sections (such as cell, timing, etc.)
         self.stack = []
-        #FIXME: should I make self.cells a dict?
-        self.cells = []
-        # Should have a cell dict, each cell should have a pin dict, etc.
-        # Suppose we have only one library in the LEF file
         self.library = None
 
 

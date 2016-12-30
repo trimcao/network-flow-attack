@@ -61,8 +61,6 @@ class Macro(Statement):
         Statement.__init__(self)
         self.type = 'MACRO'
         self.name = name
-        # other info is stored in this dictionary
-        self.info = {}
         # pin dictionary
         self.pin_dict = {}
         self.class_name = None
@@ -100,39 +98,28 @@ class Macro(Statement):
         otherwise, return the object that will be parsed next.
         """
         if data[0] == "CLASS":
-            self.info["CLASS"] = data[1]
             self.class_name = data[1]
         elif data[0] == "ORIGIN":
             x_cor = float(data[1])
             y_cor = float(data[2])
-            self.info["ORIGIN"] = (x_cor, y_cor)
             self.origin = (x_cor, y_cor)
         elif data[0] == "FOREIGN":
-            self.info["FOREIGN"] = data[1:]
             self.foreign = data[1:]
         elif data[0] == "SIZE":
             width = float(data[1])
             height = float(data[3])
-            self.info["SIZE"] = (width, height)
             self.size = (width, height)
         elif data[0] == "SYMMETRY":
-            self.info["SYMMETRY"] = data[1:]
             self.symmetry = data[1:]
         elif data[0] == "SITE":
-            self.info["SITE"] = data[1]
             self.site = data[1]
         elif data[0] == "PIN":
             new_pin = Pin(data[1])
             self.pin_dict[data[1]] = new_pin
             self.pins.append(new_pin)
-            if "PIN" in self.info:
-                self.info["PIN"].append(new_pin)
-            else:
-                self.info["PIN"] = [new_pin]
             return new_pin
         elif data[0] == "OBS":
             new_obs = Obs()
-            self.info["OBS"] = new_obs
             self.obs = new_obs
             return new_obs
         elif data[0] == "END":
@@ -155,7 +142,6 @@ class Pin(Statement):
         Statement.__init__(self)
         self.type = "PIN"
         self.name = name
-        self.info = {}
         self.direction = None
         self.use = None
         self.port = None
@@ -169,18 +155,14 @@ class Pin(Statement):
 
     def parse_next(self, data):
         if data[0] == "DIRECTION":
-            self.info["DIRECTION"] = data[1]
             self.direction = data[1]
         elif data[0] == "USE":
-            self.info["USE"] = data[1]
             self.use = data[1]
         elif data[0] == "PORT":
             new_port = Port()
-            self.info["PORT"] = new_port
             self.port = new_port
             return new_port
         elif data[0] == "SHAPE":
-            self.info["SHAPE"] = data[1]
             self.shape = data[1]
         elif data[0] == "END":
             if data[1] == self.name:
@@ -217,16 +199,10 @@ class Port(Statement):
             name = data[1]
             new_layerdef = LayerDef(data[1])
             self.layer.append(new_layerdef)
-            if "LAYER" in self.info:
-                self.info["LAYER"].append(new_layerdef)
-            else:
-                self.info["LAYER"] = [new_layerdef]
         elif data[0] == "RECT":
             # error if the self.info["LAYER"] does not exist
-            self.info["LAYER"][-1].add_rect(data)
             self.layer[-1].add_rect(data)
         elif data[0] == "POLYGON":
-            self.info["LAYER"][-1].add_polygon(data)
             self.layer[-1].add_polygon(data)
         return 0
 
@@ -258,7 +234,6 @@ class Obs(Statement):
         Statement.__init__(self)
         self.type = "OBS"
         self.name = ""
-        self.info = {}
         self.layer = []
 
 
@@ -275,16 +250,10 @@ class Obs(Statement):
             name = data[1]
             new_layerdef = LayerDef(data[1])
             self.layer.append(new_layerdef)
-            if "LAYER" in self.info:
-                self.info["LAYER"].append(new_layerdef)
-            else:
-                self.info["LAYER"] = [new_layerdef]
         elif data[0] == "RECT":
             # error if the self.info["LAYER"] does not exist
-            self.info["LAYER"][-1].add_rect(data) # [-1] means the latest layer
             self.layer[-1].add_rect(data)
         elif data[0] == "POLYGON":
-            self.info["LAYER"][-1].add_polygon(data)
             self.layer[-1].add_polygon(data)
         return 0
 

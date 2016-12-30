@@ -32,7 +32,7 @@ class LefParser:
         :return: void
         """
         for macro in self.macro_dict:
-            self.cell_height = self.macro_dict[macro].info["SIZE"][1]
+            self.cell_height = self.macro_dict[macro].size[1]
             break
 
     def parse(self):
