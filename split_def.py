@@ -7,6 +7,7 @@ Date: August 2016
 from def_parser import *
 from lef_parser import *
 
+
 def proper_layers(back_end, front_end, split_layer):
     layers = set()
     if back_end == False and front_end == False:
@@ -23,6 +24,7 @@ def proper_layers(back_end, front_end, split_layer):
         return layers
     else:
         return LAYERS
+
 
 # names of back-end and front-end layers
 LAYERS = {"poly", "metal1", "metal2", "metal3", "metal4", "metal5", "metal6",
@@ -58,7 +60,7 @@ def output_nets(nets, def_info, lef_info):
 
 def output_net_routes(net, def_info, lef_info):
     """
-    Return None if there are no routes in the
+    Return None if there are no routes in the Net.
     :param net: a Net object
     :param def_info: a DefParser object that contains DEF info.
     :param lef_info: a LefParser object
@@ -81,6 +83,7 @@ def output_net_routes(net, def_info, lef_info):
     else:
         return s
 
+
 def output_net(net, def_info, lef_info):
     """
     Output a Net object inside the NETS section information with possible back
@@ -93,6 +96,8 @@ def output_net(net, def_info, lef_info):
     routes = output_net_routes(net, def_info, lef_info)
     if routes == "no route":
         routes = ""
+    elif routes == -1:
+        return ""
     # start setting up the string
     s = ""
     s += "- " + net.name + "\n"
@@ -109,7 +114,7 @@ def output_net(net, def_info, lef_info):
             comp_id = each_comp[0]
             pin_name = each_comp[1]
             comp = def_info.components.get_comp(comp_id).get_macro()
-            #print (comp)
+            # print (comp)
             # get info from LEF Parser
             comp_info = lef_info.macro_dict[comp]
             # get pin layer info
@@ -121,6 +126,7 @@ def output_net(net, def_info, lef_info):
     s += routes
     s += " ;"
     return s
+
 
 def output_comps(comps):
     """
@@ -136,6 +142,7 @@ def output_comps(comps):
     else:
         return ""
 
+
 def output_pin(pin, def_info):
     """
     Method to write/output a pin to the DEF file
@@ -143,7 +150,7 @@ def output_pin(pin, def_info):
     :param def_info: DEF data
     :return: a string that contains a Pin in DEF format.
     """
-    #print (pin.get_layer())
+    # print (pin.get_layer())
     if pin.get_metal_layer() in GOOD_LAYERS:
         return pin.to_def_format()
     else:
@@ -151,6 +158,7 @@ def output_pin(pin, def_info):
         s += "- " + pin.name + " + NET " + pin.net
         s += " + DIRECTION " + pin.direction + " + USE " + pin.use + "\n ;"
         return s
+
 
 def output_pins(pins, def_info):
     """
@@ -175,6 +183,7 @@ def output_pins(pins, def_info):
     s += "END PINS"
     return s
 
+
 def output_tracks(def_info):
     """
     Method to write/output TRACKS to DEF file.
@@ -187,6 +196,7 @@ def output_tracks(def_info):
             s += track.to_def_format()
             s += "\n"
     return s
+
 
 def output_new_def(def_info, lef_info):
     """
@@ -211,10 +221,12 @@ def output_new_def(def_info, lef_info):
     s += props.to_def_format()
     s += "\n"
     s += "DIEAREA"
-    s += (" ( " + str(def_info.diearea[0][0]) + " " + str(def_info.diearea[0][1]) +
-          " )")
-    s += (" ( " + str(def_info.diearea[1][0]) + " " + str(def_info.diearea[1][1]) +
-          " )" + " ;")
+    s += (
+    " ( " + str(def_info.diearea[0][0]) + " " + str(def_info.diearea[0][1]) +
+    " )")
+    s += (
+    " ( " + str(def_info.diearea[1][0]) + " " + str(def_info.diearea[1][1]) +
+    " )" + " ;")
     s += "\n\n"
     for each_row in def_info.rows:
         s += each_row.to_def_format()
@@ -236,11 +248,108 @@ def output_new_def(def_info, lef_info):
     s += output_nets(nets, def_info, lef_info)
     return s
 
+
 def to_bool(str):
     if str.lower() == "false":
         return False
     else:
         return bool(str)
+
+
+def connected_primary_pin_route(pin, route, def_data):
+    """
+    Check if a route connects to a primary pin.
+    :param pin: the pin.
+    :param route: the route.
+    :param def_data: DEF data.
+    :return: True or False
+    """
+    pin_data = def_data.pins.pin_dict[pin[1]]
+    pin_loc = pin_data.placed
+    # NOTE: pin distance from the border in Nangate is 70.
+    locations = [[pin_loc[0] - 70, pin_loc[1]], [pin_loc[0] + 70, pin_loc[1]],
+                 [pin_loc[0], pin_loc[1] - 70], [pin_loc[0], pin_loc[1] + 70]]
+    # print(locations)
+    for each_pt in route.points:
+        for each_loc in locations:
+            if each_pt[:2] == each_loc:
+                return True
+    return False
+
+
+def connected_cell_pin_routed(pin, route, def_data, lef_data):
+    """
+    Check if a route connects to a cell pin.
+    :param pin:
+    :param route:
+    :param def_data:
+    :param lef_data:
+    :return: True or False
+    """
+    comp = def_parser.components.comp_dict[pin[0]]
+    macro_name = comp.macro
+    macro_data = lef_data.macro_dict[macro_name]
+    pin_data = macro_data.pin_dict[pin[1]]
+
+
+def split_net(def_data, lef_data):
+    """
+    Modify the DEF data to split the net affected by split manufacturing.
+    :param def_data: a DefParser instantiation.
+    :return: void
+    """
+    nets = def_data.nets
+    net_dict = nets.net_dict
+    # n9 = net_dict['n9']
+    # n9_routes = n9.routed
+    # for j in range(1, len(n9.routed)):
+    #     print(connected_routes(n9.routed[0], n9.routed[j]))
+
+    for each_net in nets.nets:
+        if each_net.top_layer in GOOD_LAYERS:
+            pass
+        else:
+            # find the routes that belong to FEOL
+            new_routed = []
+            for each_route in each_net.routed:
+                if each_route.layer in GOOD_LAYERS:
+                    new_routed.append(each_route)
+            # find the groups of connected routes
+            union = [i for i in range(len(new_routed))]
+            for i in range(len(new_routed) - 1):
+                for j in range(i + 1, len(new_routed)):
+                    if connected_routes(new_routed[i], new_routed[j]):
+                        union[j] = union[i]
+            print(each_net.name)
+            print(union)
+            groups = {}
+            for i in range(len(new_routed)):
+                if union[i] not in groups:
+                    groups[union[i]] = [new_routed[i]]
+                else:
+                    groups[union[i]].append(new_routed[i])
+            # now find the comp/pin for each union
+            comp_pin = each_net.comp_pin
+            comp_pin_groups = {}
+            for each in groups:
+                comp_pin_groups[each] = []
+                each_group = groups[each]
+                for each_comp_pin in comp_pin:
+                    for each_route in each_group:
+                        if each_comp_pin[0] == 'PIN':
+                            # find connection with a primary pin
+                            if connected_primary_pin_route(each_comp_pin, each_route, def_data):
+                                comp_pin_groups[each].append(each_comp_pin)
+                        else:
+                            # find connection with a cell pin
+                            if connected_cell_pin_routed(each_comp_pin, each_route, def_data, lef_data):
+                                comp_pin_groups[each].append(each_comp_pin)
+                print(comp_pin_groups[each])
+
+
+    # print(def_data.to_def_format())
+
+
 
 # Main Class
 if __name__ == '__main__':
@@ -251,10 +360,10 @@ if __name__ == '__main__':
     OUTPUT_FILE = "./def_write/test.def"
     INPUT_FILE = "./libraries/DEF/c1908.def"
     # load last setup from split_def.ini
-    print ("Last setup: ")
+    print("Last setup: ")
     last_setup = open("split_def.ini", "r")
     for line in last_setup:
-        print (line[:-1])
+        print(line[:-1])
         text = line.split()
         if text[0] == "BACK_END":
             BACK_END = to_bool(text[2])
@@ -267,7 +376,7 @@ if __name__ == '__main__':
         elif text[0] == "INPUT_FILE_NAME":
             INPUT_FILE = text[2]
 
-    print ()
+    print()
     last_setup.close()
 
     use_last_setup = input("Use last setup? (y/n): ")
@@ -292,33 +401,37 @@ if __name__ == '__main__':
         OUTPUT_FILE = output_name
         # write current settings to a file
         setup_file = open("split_def.ini", "w+")
-        setup_file.write("INPUT_FILE_NAME = " + input_name +"\n")
+        setup_file.write("INPUT_FILE_NAME = " + input_name + "\n")
         setup_file.write("BACK_END = " + str(BACK_END) + "\n")
         setup_file.write("FRONT_END = " + str(FRONT_END) + "\n")
         setup_file.write("SPLIT_LAYER = " + SPLIT_LAYER + "\n")
-        setup_file.write("OUTPUT_FILE_NAME = " + output_name +"\n")
+        setup_file.write("OUTPUT_FILE_NAME = " + output_name + "\n")
         setup_file.close()
     else:
-        print ("The program will use the last setup listed above.")
+        print("The program will use the last setup listed above.")
 
-    #print (BACK_END)
-    #print (FRONT_END)
-    #print (SPLIT_LAYER)
+    # print (BACK_END)
+    # print (FRONT_END)
+    # print (SPLIT_LAYER)
 
     # need to know what layers are good for the current back-end and
     # front-end settings
     GOOD_LAYERS = proper_layers(BACK_END, FRONT_END, SPLIT_LAYER)
 
-    print ()
-    lef_file = "./libraries/Nangate/NangateOpenCellLibrary.lef"
+    print()
+    lef_file = "./c17_example/NangateOpenCellLibrary.lef"
     lef_parser = LefParser(lef_file)
     lef_parser.parse()
-    print ()
+    print()
     def_file = INPUT_FILE
     def_parser = DefParser(def_file)
     def_parser.parse()
-    print ("Writing data to new DEF file with path: " + OUTPUT_FILE )
+
+    split_net(def_parser, lef_parser)
+    exit()
+
+    print("Writing data to new DEF file with path: " + OUTPUT_FILE)
     out_file = open(OUTPUT_FILE, "w+")
     out_file.write(output_new_def(def_parser, lef_parser))
     out_file.close()
-    print ("Writing data done.")
+    print("Writing data done.")

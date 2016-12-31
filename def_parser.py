@@ -156,13 +156,13 @@ class DefParser:
             s += each_gcell.to_def_format()
             s += "\n"
         s += "\n"
-        comps = def_parser.sections[1]
+        comps = self.sections[1]
         s += comps.to_def_format()
         s += "\n\n"
-        pins = def_parser.sections[2]
+        pins = self.sections[2]
         s += pins.to_def_format()
         s += "\n\n"
-        nets = def_parser.sections[3]
+        nets = self.sections[3]
         s += nets.to_def_format()
         return s
 
@@ -185,7 +185,7 @@ class DefParser:
 # Main Class
 if __name__ == '__main__':
     # read_path = "./libraries/DEF/c880_tri.def"
-    read_path = "./libraries/DEF/c2670_dq.def"
+    read_path = "./c17_example/c17_45nm_routing_layer4.def"
     def_parser = DefParser(read_path)
     def_parser.parse()
 

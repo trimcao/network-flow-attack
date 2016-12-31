@@ -8,6 +8,7 @@ New version, updated Decemeber 2016.
 """
 from util import *
 
+
 class Statement:
     """
     General class for all types of Statements in the LEF file
@@ -29,7 +30,7 @@ class Statement:
             name = data[1]
             new_state = Macro(name)
             return new_state
-        elif data[0] == "LAYER" and len(data) == 2: # does not have ;
+        elif data[0] == "LAYER" and len(data) == 2:  # does not have ;
             name = data[1]
             new_state = Layer(name)
             return new_state
@@ -71,7 +72,6 @@ class Macro(Statement):
         self.size = None
         self.pins = []
         self.obs = None
-
 
     def __str__(self):
         """
@@ -222,8 +222,6 @@ class Port(Statement):
         return highest
 
 
-
-
 class Obs(Statement):
     """
     Class Obs represents an OBS statement in the LEF file.
@@ -235,7 +233,6 @@ class Obs(Statement):
         self.type = "OBS"
         self.name = ""
         self.layer = []
-
 
     def __str__(self):
         s = ""
@@ -286,7 +283,7 @@ class LayerDef:
         # add each pair of (x, y) points to a list
         for idx in range(1, len(data) - 2, 2):
             x_cor = float(data[idx])
-            y_cor = float(data[idx+1])
+            y_cor = float(data[idx + 1])
             points.append([x_cor, y_cor])
         polygon = Polygon(points)
         self.shapes.append(polygon)
@@ -307,6 +304,7 @@ class Polygon:
     """
     Class Polygon represents a Polygon definition in a LayerDef
     """
+
     def __init__(self, points):
         self.type = "POLYGON"
         self.points = points
@@ -316,6 +314,7 @@ class Layer(Statement):
     """
     Layer class represents a LAYER section in LEF file.
     """
+
     def __init__(self, name):
         # initiate the Statement superclass
         Statement.__init__(self)
@@ -379,10 +378,12 @@ class Layer(Statement):
                 return -1
         return 0
 
+
 class Via(Statement):
     """
     Via class represents a VIA section in LEF file.
     """
+
     def __init__(self, name):
         # initiate the Statement superclass
         Statement.__init__(self)
@@ -398,8 +399,7 @@ class Via(Statement):
             new_layerdef = LayerDef(data[1])
             self.layers.append(new_layerdef)
         elif data[0] == "RECT":
-            self.layers[-1].add_rect(data) # [-1] means the latest layer
+            self.layers[-1].add_rect(data)  # [-1] means the latest layer
         elif data[0] == "POLYGON":
             self.layers.add_polygon(data)
         return 0
-

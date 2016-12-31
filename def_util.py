@@ -41,7 +41,7 @@ class Pins:
                 new_layer.points.append([int(info[3]), int(info[4])])
                 new_layer.points.append([int(info[7]), int(info[8])])
                 current_pin.layer = new_layer
-            elif info[0] == "PLACED":
+            elif info[0] == "PLACED" or info[0] == "FIXED":
                 current_pin.placed = [int(info[2]), int(info[3])]
                 current_pin.orient = info[5]
 
@@ -234,6 +234,8 @@ class Nets:
             elif info[0] == "ROUTED" or info[0] == "NEW":
                 new_routed = Routed()
                 new_routed.layer = info[1]
+                if compare_metal(new_routed.layer, current_net.top_layer) > 0:
+                    current_net.top_layer = new_routed.layer
                 # add points to the new_routed
                 for idx in range(2, len(info)):
                     if isinstance(info[idx], list):
@@ -281,6 +283,7 @@ class Net:
         self.name = name
         self.comp_pin = []
         self.routed = []
+        self.top_layer = 'metal1'
 
     def __str__(self):
         s = ""
@@ -309,6 +312,7 @@ class Net:
                 s += "    " + "NEW " + self.routed[i].to_def_format() + "\n"
         s += " ;"
         return s
+
 
 class Routed:
     """

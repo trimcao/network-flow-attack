@@ -390,3 +390,20 @@ def sorted_components(layout_area, row_height, comps):
     for each_row in rows:
         each_row.sort(key = lambda x: x.placed[0])
     return rows
+
+
+def connected_routes(route1, route2):
+    """
+    check if two routes are connected.
+    :param route1: route 1
+    :param route2: route 2
+    :return: True or False
+    """
+    result = False
+    for each_pt1 in route1.points:
+        for each_pt2 in route2.points:
+            if each_pt1 == each_pt2:
+                return True
+    return result
+
+
