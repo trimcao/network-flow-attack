@@ -286,10 +286,39 @@ def connected_cell_pin_routed(pin, route, def_data, lef_data):
     :param lef_data:
     :return: True or False
     """
+    # check for end_via of the route
+    # only via_1 can connect to a cell pin, or the wire is metal1.
+    end_via = route.end_via
+    end_via_loc = route.end_via_loc
+    if (end_via and end_via[:4] != 'via1') and route.layer != 'metal1':
+        return False
+    # get pin data from LEF
     comp = def_parser.components.comp_dict[pin[0]]
     macro_name = comp.macro
     macro_data = lef_data.macro_dict[macro_name]
     pin_data = macro_data.pin_dict[pin[1]]
+    # method 1: check if the wire or via is inside the pin
+    # get the vertical lines in the polygon
+    # max_y = -1
+    # port_data = pin_data.port
+    # for each_layer in port_data.layer:
+    #     for each_shape in each_layer:
+    #         check if the via is in the shape
+            # pass
+
+    # method 2: check if the wire or via is inside the cell, because I guess
+    # a net usually connects only one pin of a cell.
+    macro_size = macro_data.size
+    cell_loc = comp.placed
+    corners = [cell_loc, [cell_loc[0] + macro_size[0] * SCALE, cell_loc[1] + macro_size[1] * SCALE]]
+    if end_via:
+        return inside_area(end_via_loc, corners)
+    else:
+        for each_pt in route.points:
+            if inside_area(each_pt, corners):
+                return True
+        return False
+
 
 
 def split_net(def_data, lef_data):
@@ -304,10 +333,13 @@ def split_net(def_data, lef_data):
     # n9_routes = n9.routed
     # for j in range(1, len(n9.routed)):
     #     print(connected_routes(n9.routed[0], n9.routed[j]))
-
+    new_nets = []
+    new_net_dict = {}
     for each_net in nets.nets:
         if each_net.top_layer in GOOD_LAYERS:
-            pass
+            # add the net to a list of good nets.
+            new_nets.append(each_net)
+            new_net_dict[each_net.name] = each_net
         else:
             # find the routes that belong to FEOL
             new_routed = []
@@ -321,13 +353,14 @@ def split_net(def_data, lef_data):
                     if connected_routes(new_routed[i], new_routed[j]):
                         union[j] = union[i]
             print(each_net.name)
-            print(union)
+            # print(union)
             groups = {}
             for i in range(len(new_routed)):
                 if union[i] not in groups:
                     groups[union[i]] = [new_routed[i]]
                 else:
                     groups[union[i]].append(new_routed[i])
+            print(len(groups))
             # now find the comp/pin for each union
             comp_pin = each_net.comp_pin
             comp_pin_groups = {}
@@ -343,11 +376,23 @@ def split_net(def_data, lef_data):
                         else:
                             # find connection with a cell pin
                             if connected_cell_pin_routed(each_comp_pin, each_route, def_data, lef_data):
-                                comp_pin_groups[each].append(each_comp_pin)
+                                if not each_comp_pin in comp_pin_groups[each]:
+                                    comp_pin_groups[each].append(each_comp_pin)
                 print(comp_pin_groups[each])
 
+            # Now create new nets
+            net_name = each_net.name
+            for each in groups:
+                new_name = net_name + '_' + str(each)
+                new_net = Net(new_name)
+                new_net.comp_pin = comp_pin_groups[each]
+                new_net.routed = groups[each]
+                new_nets.append(new_net)
+                new_net_dict[new_name] = new_net
 
-    # print(def_data.to_def_format())
+    # Change the nets list in the DEF
+    nets.nets = new_nets
+    nets.net_dict = new_net_dict
 
 
 
@@ -428,7 +473,7 @@ if __name__ == '__main__':
     def_parser.parse()
 
     split_net(def_parser, lef_parser)
-    exit()
+    # exit()
 
     print("Writing data to new DEF file with path: " + OUTPUT_FILE)
     out_file = open(OUTPUT_FILE, "w+")

@@ -285,6 +285,10 @@ class Net:
         self.routed = []
         self.top_layer = 'metal1'
 
+    def find_top_layer(self):
+        # find the top metal layer among the routes.
+        pass
+
     def __str__(self):
         s = ""
         s += self.type + ": " + self.name + "\n"

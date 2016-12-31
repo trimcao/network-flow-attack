@@ -252,6 +252,8 @@ class Obs(Statement):
             self.layer[-1].add_rect(data)
         elif data[0] == "POLYGON":
             self.layer[-1].add_polygon(data)
+        elif is_float_try(data[0]):
+            self.layer[-1].add_more_polygon(data)
         return 0
 
 
@@ -287,6 +289,13 @@ class LayerDef:
             points.append([x_cor, y_cor])
         polygon = Polygon(points)
         self.shapes.append(polygon)
+
+    def add_more_polygon(self, data):
+        last_polygon = self.shapes[-1]
+        for idx in range(0, len(data) - 2, 2):
+            x_cor = float(data[idx])
+            y_cor = float(data[idx + 1])
+            last_polygon.points.append([x_cor, y_cor])
 
 
 class Rect:

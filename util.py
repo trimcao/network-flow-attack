@@ -407,3 +407,11 @@ def connected_routes(route1, route2):
     return result
 
 
+def is_float_try(str):
+    try:
+        float(str)
+        return True
+    except ValueError:
+        return False
+
+
