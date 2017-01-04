@@ -335,7 +335,7 @@ class Routed:
         s += self.layer
         for pt in self.points:
             s += " " + str(pt)
-        if self.end_via != None:
+        if self.end_via:
             s += " " + self.end_via
         return s
 
