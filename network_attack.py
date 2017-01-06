@@ -51,8 +51,67 @@ def distance_two_nets(net1, net2):
     return min_dist
 
 
+def connected_comps(def_data, lef_data, pin_net_dict):
+    """
+    Get the dictionary of connected components for each cell in the layout.
+    :param def_data: DEF data
+    :return: a dictionary.
+    """
+    connected = {}
+    cell_dict = def_data.components.comp_dict
+    for each_cell in cell_dict:
+        inputs, outputs = get_pins_cell(each_cell, def_data, lef_data)
+        connected[each_cell] = set()
+        for each_input in inputs:
+            # print(each_input)
+            if each_input in pin_net_dict:
+                connected_net = pin_net_dict[each_input]
+                # print(connected_net)
+                for each_pin in connected_net.comp_pin:
+                    if each_pin[0] != each_cell:
+                        connected[each_cell].add(tuple(each_pin))
+    return connected
+
+
+def find_cell_connected(cell, connected_dict):
+    """
+    Find the chain of cells (that potentially can cause a loop).
+    Recursive function.
+    :param cell:
+    :param connected_dict:
+    :return: a set of connected cells
+    """
+    if cell == 'PIN':
+        return set()
+    connected_cells = set()
+    stack = []
+    stack.append(cell)
+    while len(stack) > 0:
+        current_cell = stack.pop()
+        for each_pin in connected_dict[current_cell]:
+            next_cell = each_pin[0]
+            if next_cell != 'PIN':
+                connected_cells.add(each_pin[0])
+                stack.append(each_pin[0])
+    return connected_cells
+
+
+def get_pins_cell(cell, def_data, lef_data):
+    inputs = []
+    outputs = []
+    macro_name = def_data.components.comp_dict[cell].macro
+    macro_data = lef_data.macro_dict[macro_name]
+    for each_pin in macro_data.pin_dict:
+        pin_data = macro_data.pin_dict[each_pin]
+        if pin_data.direction == 'INPUT':
+            inputs.append((cell, pin_data.name))
+        elif pin_data.direction == 'OUTPUT':
+            outputs.append((cell, pin_data.name))
+    return inputs, outputs
+
+
 def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
-                    pin_net_dict):
+                    pin_net_dict, connected_dict):
     """
     Build the distance table for every pair of pins.
     A distance of -1 means there is no possible connection between those pins.
@@ -70,9 +129,12 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
     for i in range(len(source_pins)):
         # build the set of connected pins
         connected_comps = set()
+        source_cell = source_pins[i][0]
         source_net = pin_net_dict[source_pins[i]]
         for each_pin in source_net.comp_pin:
             connected_comps.add(each_pin[0])
+        # find the connected cells in the chain (so no loop)
+        connected_comps = connected_comps ^ find_cell_connected(source_cell, connected_dict)
         # find the distance through different cases.
         for j in range(len(sink_pins)):
             sink_net = pin_net_dict[sink_pins[j]]
@@ -128,10 +190,8 @@ if __name__ == '__main__':
     pin_dict = def_parser.pins.pin_dict
     pin_net_dict = {}
     for each_net in nets.nets:
-        # print(each_net.name)
         for each_pin in each_net.comp_pin:
             current_pin = tuple(each_pin)
-            # print(current_pin)
             pin_net_dict[current_pin] = each_net
             if current_pin[0] == 'PIN':
                 primary_pin = pin_dict[current_pin[1]]
@@ -143,7 +203,6 @@ if __name__ == '__main__':
                     primary_outputs.add(current_pin)
             else:
                 macro_name = def_parser.components.comp_dict[current_pin[0]].macro
-                # print(macro_name)
                 macro_data = lef_parser.macro_dict[macro_name]
                 pin_data = macro_data.pin_dict[current_pin[1]]
                 if pin_data.direction == 'INPUT':
@@ -153,18 +212,19 @@ if __name__ == '__main__':
                     source_pins.append(current_pin)
                     output_cell_pins.add(current_pin)
 
+    # find the connected dict (chain of cells):
+    connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
+
     # find the closest distance between those pins
     # we need a 2D list
     print(source_pins)
     print(sink_pins)
-    # done_sinks = get_done_sinks(sink_pins, pin_net_dict)
-    # print(done_sinks)
 
     # Get the distance table between source and sink pins
     # NOTE: maybe a nested dictionary is better than a 2D list to represent
     # the distance table.
     distances = build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
-                    pin_net_dict)
+                    pin_net_dict, connected_dict)
 
     # start creating a graph
     G = nx.DiGraph()
