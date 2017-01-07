@@ -123,8 +123,8 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
     """
     # default value = 1
     distances = [[1 for i in range(len(sink_pins))] for j in range(len(source_pins))]
-    print(len(source_pins))
-    print(len(sink_pins))
+    # print(len(source_pins))
+    # print(len(sink_pins))
     done_sinks = get_done_sinks(sink_pins, pin_net_dict)
     for i in range(len(source_pins)):
         # build the set of connected pins
@@ -157,11 +157,101 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
                 # those pins.
                 distances[i][j] = distance_two_nets(source_net, sink_net)
 
-
-    print(distances)
-    print(distances[-2])
+    # print(distances)
+    # print(distances[-2])
     return distances
 
+
+def output_verilog(connections, def_data, lef_data, verilog_file):
+    """
+    Output a verilog netlist from the connections inferred.
+    :param connections: connections dictionary
+    :param verilog_file: verilog file name
+    :return: void
+    """
+    inputs = []
+    outputs = []
+    wires = []
+    # create the netlist, a dictionary of net that connects each pin
+    netlist = {}
+    net_idx = 1
+    for each_pin in connections:
+        # get the net name
+        net_name = None
+        if each_pin[0] == 'PIN':
+            net_name = each_pin[1]
+            inputs.append(net_name)
+        else:
+            # check for primary output pin
+            for each_connect in connections[each_pin]:
+                if each_connect[0] == 'PIN':
+                    net_name = each_connect[1]
+                    outputs.append(net_name)
+            if not net_name:
+                net_name = 'n' + str(net_idx)
+                wires.append(net_name)
+                net_idx += 1
+        # assign the net to pins
+        netlist[each_pin] = net_name
+        for each_connect in connections[each_pin]:
+            netlist[each_connect] = net_name
+    # write cells in verilog format
+    cell_dict = def_data.components.comp_dict
+    cells = []
+    for each_cell in cell_dict:
+        new_cell = ''
+        # get the pin dictionary of the cell
+        macro_name = cell_dict[each_cell].macro
+        macro_data = lef_data.macro_dict[macro_name]
+        new_cell += macro_name + ' ' + each_cell + ' ( '
+        pin_dict = macro_data.pin_dict
+        pin_list = []
+        for each_pin in pin_dict:
+            direction = pin_dict[each_pin].direction
+            if direction == 'INPUT' or direction == 'OUTPUT':
+                new_pin = ''
+                pin_tuple = (each_cell, each_pin)
+                new_pin += '.' + each_pin + '('
+                net_name = netlist[pin_tuple]
+                new_pin += net_name + ')'
+                pin_list.append(new_pin)
+        new_cell += ', '.join(pin_list)
+        new_cell += ' );'
+        cells.append(new_cell)
+    # building the output string
+    design_name = def_data.design_name
+    inouts = inputs + outputs
+    # start writing
+    f = open(verilog_file, 'w')
+    s = '\n'
+    s += 'module ' + design_name + '( '
+    s += ', '.join(inouts)
+    s += ' );\n'
+    # write input
+    s += '  input ' + ', '.join(inputs) + ';\n'
+    # write output
+    s += '  output ' + ', '.join(outputs) + ';\n'
+    # write wire
+    s += '  wire ' + ', '.join(wires) + ';\n'
+    s += '\n'
+    # write cells
+    for each_cell in cells:
+        s += '  ' + each_cell + '\n'
+    s += '\n'
+    s += 'endmodule'
+    # write to file
+    f.write(s)
+    f.close()
+
+
+def get_macro_pins(cell_name, def_data, lef_data):
+    """
+    Get a dictionary of pins for a cell
+    :param macro:
+    :param lef_data:
+    :return:
+    """
+    pass
 
 
 # Main Class
@@ -217,8 +307,8 @@ if __name__ == '__main__':
 
     # find the closest distance between those pins
     # we need a 2D list
-    print(source_pins)
-    print(sink_pins)
+    # print(source_pins)
+    # print(sink_pins)
 
     # Get the distance table between source and sink pins
     # NOTE: maybe a nested dictionary is better than a 2D list to represent
@@ -260,18 +350,26 @@ if __name__ == '__main__':
 
     mincostFlow = nx.max_flow_min_cost(G, source_name, sink_name)
     mincost = nx.cost_of_flow(G, mincostFlow)
-    print(mincostFlow)
-    print(mincost)
-    print()
+    # print(mincostFlow)
+    # print(mincost)
+    # print()
+
+    # get the final connections
+    connections = {}
     for each in source_pins:
-        print(each)
-        print(mincostFlow[each])
-        print()
+        connections[each] = []
+        for each_sink in mincostFlow[each]:
+            if mincostFlow[each][each_sink] > 0:
+                connections[each].append(each_sink)
 
+    # print(connections)
+    # for each in connections:
+    #     print(each)
+    #     print(connections[each])
+    #     print()
 
-
-
-
+    verilog_out = './c17_example/c17_inferred.v'
+    output_verilog(connections, def_parser, lef_parser, verilog_out)
 
 
 
