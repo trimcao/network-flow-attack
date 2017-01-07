@@ -7,12 +7,12 @@ Date: December 2016
 from def_parser import *
 from lef_parser import *
 import networkx as nx
-from networkx.algorithms.flow import max_flow_min_cost
-
+# from networkx.algorithms.flow import max_flow_min_cost
+import argparse
 
 def get_done_sinks(sink_pins, pin_net_dict):
     """
-    Find all the sink pins that are already connected.
+    Find all the sink pins that are already connected.a
     :param sink_pins: a list of sink pins.
     :param pin_net_dict: pin to net dictionary (mapping).
     :return: a set of connected sink pins
@@ -224,7 +224,7 @@ def output_verilog(connections, def_data, lef_data, verilog_file):
     # start writing
     f = open(verilog_file, 'w')
     s = '\n'
-    s += 'module ' + design_name + '( '
+    s += 'module ' + design_name + ' ( '
     s += ', '.join(inouts)
     s += ' );\n'
     # write input
@@ -256,12 +256,23 @@ def get_macro_pins(cell_name, def_data, lef_data):
 
 # Main Class
 if __name__ == '__main__':
+    # inputs: LEF, DEF
+    # output: Verilog
+    parser = argparse.ArgumentParser(description='FEOL attack tool.')
+    parser.add_argument('-lef', '--lef', help='LEF file path', required=True)
+    parser.add_argument('-i', '--input', help='Input DEF layout file name', required=True)
+    parser.add_argument('-o', '--output', help='Output Verilog file name',
+                        required=True)
+    args = parser.parse_args()
+
     # Load the Layout
-    lef_file = "./c17_example/NangateOpenCellLibrary.lef"
+    # lef_file = "./c17_example/NangateOpenCellLibrary.lef"
+    lef_file = args.lef
     lef_parser = LefParser(lef_file)
     lef_parser.parse()
 
-    def_file = "./c17_example/c17_split_metal3.def"
+    # def_file = "./c17_example/c17_split_metal3.def"
+    def_file = args.input
     def_parser = DefParser(def_file)
     def_parser.parse()
 
@@ -368,7 +379,8 @@ if __name__ == '__main__':
     #     print(connections[each])
     #     print()
 
-    verilog_out = './c17_example/c17_inferred.v'
+    # verilog_out = './c17_example/c17_inferred.v'
+    verilog_out = args.output
     output_verilog(connections, def_parser, lef_parser, verilog_out)
 
 
