@@ -254,6 +254,65 @@ def get_macro_pins(cell_name, def_data, lef_data):
     pass
 
 
+def net_end_points(net_name, def_data):
+    """
+    Find the end-points and the point leading to each end-point (so we can
+      infer the direction of the wire)
+    :param net_name: name of the net
+    :param def_data: data from DEF file
+    :return: a dictionary of end-points
+    """
+    die_area = def_data.diearea
+    net_data = def_data.nets.net_dict[net_name]
+    ends_dict = {} # end-points dictionary
+    end_points = set() # set of end_points
+    # initialize the ends_dict
+    for each_route in net_data.routed:
+        if each_route.end_via and each_route.end_via[:4] == 'via1':
+            end_points.add(tuple(each_route.end_via_loc[:2]))
+        for each_pt in each_route.points:
+            # check for border (pin location)
+            if on_border(each_pt, die_area):
+                end_points.add(tuple(each_pt[:2]))
+            tuple_pt = tuple(each_pt[:2])
+            # create the list in ends_dict if it does not exist
+            if tuple_pt not in ends_dict:
+                ends_dict[tuple_pt] = []
+            # add end points from the route
+            for each_end in each_route.points:
+                if each_end != each_pt:
+                    ends_dict[tuple_pt].append(tuple(each_end[:2]))
+    # print(end_points)
+    # print(ends_dict)
+    # visited points
+    end_points = list(end_points)
+    visited = set()
+    # follow the end points
+    num_points = len(ends_dict)
+    while len(visited) < num_points and len(end_points) > 0:
+        # cont = False
+        current_end = end_points.pop()
+        if current_end not in visited:
+            visited.add(current_end)
+            next_pts = ends_dict[current_end]
+            if len(next_pts) == 0:
+                end_points.append(current_end)
+            else:
+                new_end = False
+                for each_next in next_pts:
+                    if each_next not in visited:
+                        end_points.append(each_next)
+                        new_end = True
+                if not new_end:
+                    end_points.append(current_end)
+
+    print(end_points)
+    print(ends_dict)
+
+    return end_points, ends_dict
+
+
+
 # Main Class
 if __name__ == '__main__':
     # inputs: LEF, DEF
@@ -286,6 +345,18 @@ if __name__ == '__main__':
     primary_inputs = set()
     primary_outputs = set()
 
+    # test net_end_points
+    net_dict = def_parser.nets.net_dict
+    # end_points, ends_dict = net_end_points('n9_2', def_parser)
+    # end_points, ends_dict = net_end_points('N7', def_parser)
+    for each_net in net_dict:
+        print(each_net)
+        end_points, ends_dict = net_end_points(each_net, def_parser)
+        # print(end_points)
+        # for each in end_points:
+        #     print(str(each) + ': ' + str(ends_dict[each]))
+        print()
+    exit()
     # Get pins from nets
     nets = def_parser.nets
     pin_dict = def_parser.pins.pin_dict
@@ -315,11 +386,6 @@ if __name__ == '__main__':
 
     # find the connected dict (chain of cells):
     connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
-
-    # find the closest distance between those pins
-    # we need a 2D list
-    # print(source_pins)
-    # print(sink_pins)
 
     # Get the distance table between source and sink pins
     # NOTE: maybe a nested dictionary is better than a 2D list to represent

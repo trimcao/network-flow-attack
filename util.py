@@ -419,3 +419,12 @@ def manhattan_dist(point1, point2):
     return abs(point1[0] - point2[0]) + abs(point1[1] - point2[1])
 
 
+def on_border(point, die_area):
+    x1 = die_area[0][0] + 70
+    x2 = die_area[1][0] - 70
+    y1 = die_area[0][1] + 70
+    y2 = die_area[1][1] - 70
+    return point[0] <= x1 or point[0] >= x2 or point[1] <= y1 or point[1] >= y2
+
+
+
