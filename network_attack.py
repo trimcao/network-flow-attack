@@ -263,7 +263,6 @@ def net_end_points(net_name, def_data):
     :return: a dictionary of end-points
     """
     # NOTE: This function might need serious re-work.
-
     die_area = def_data.diearea
     net_data = def_data.nets.net_dict[net_name]
     ends_dict = {} # end-points dictionary
@@ -284,10 +283,9 @@ def net_end_points(net_name, def_data):
             for each_end in each_route.points:
                 if each_end != each_pt:
                     ends_dict[tuple_pt].append(tuple(each_end[:2]))
-    # print(end_points)
-    # print(ends_dict)
-    # visited points
+    # consider end_points as a stack
     end_points = list(end_points)
+    # visited points
     visited = set()
     # follow the end points
     num_points = len(ends_dict)
@@ -312,11 +310,86 @@ def net_end_points(net_name, def_data):
                             new_end = True
                 if not new_end:
                     end_points.append(current_end)
-
-    print(end_points)
-    print(ends_dict)
-
     return end_points, ends_dict
+
+
+def net_direction(end_points, ends_dict, def_data):
+    """
+    Find the directions that accept connection for a net (which may consist
+    of multiple wires)
+    :param end_points:
+    :param ends_dict:
+    :param def_data:
+    :return: a list of pairs of corner points. If a connection is within
+    one of those pairs, then it's possible.
+    """
+    # find the maximum x and y coordinate
+    die_area = def_data.diearea
+    # check for special case
+    if len(end_points) == 0:
+        return [die_area]
+    else:
+        areas = []
+        for each_end in end_points:
+            areas.append(wire_direction(each_end, ends_dict, die_area))
+        return areas
+
+
+
+def wire_direction(end_point, ends_dict, die_area):
+    """
+    Interpret the direction of a wire using end points and end points dictionary.
+    Output a pair of points (x1, y1) and (x2, y2). The possible connection must
+    belong to the rectangle composed of these two points.
+    :param end_point:
+    :param ends_dict:
+    :return: a pair of corner points
+    """
+    # boundary from die area
+    min_x = die_area[0][0]
+    min_y = die_area[0][1]
+    max_x = die_area[1][0]
+    max_y = die_area[1][1]
+    # iterate through each next point
+    next_pts = ends_dict[end_point]
+    corner1 = [min_x, min_y] # initialize the corner points
+    corner2 = [max_x, max_y]
+    for each_pt in next_pts:
+        diff_x = each_pt[0] - end_point[0]
+        diff_y = each_pt[1] - end_point[1]
+        if diff_x < 0:
+            x1 = min_x
+            x2 = end_point[0]
+        elif diff_x == 0:
+            # make no difference to the possible direction
+            x1 = min_x
+            x2 = max_x
+        else:
+            x1 = end_point[0]
+            x2 = max_x
+        # update corner of x-coordinate
+        if x1 > corner1[0]:
+            corner1[0] = x1
+        if x2 < corner2[0]:
+            corner2[0] = x2
+        # check y-coordinate
+        if diff_y < 0:
+            y1 = end_point[1]
+            y2 = max_y
+        elif diff_y == 0:
+            y1 = min_y
+            y2 = max_y
+        else:
+            y1 = min_y
+            y2 = end_point[1]
+        # update corner of y-coordinate
+        if y1 > corner1[1]:
+            corner1[1] = y1
+        if y2 < corner2[1]:
+            corner2[1] = y2
+    corners = [corner1, corner2]
+    return corners
+
 
 
 
@@ -352,20 +425,23 @@ if __name__ == '__main__':
     primary_inputs = set()
     primary_outputs = set()
 
-    # test net_end_points
-    net_dict = def_parser.nets.net_dict
-    # end_points, ends_dict = net_end_points('n9_0', def_parser)
-    # end_points, ends_dict = net_end_points('N7', def_parser)
-    for each_net in net_dict:
-        print(each_net)
-        end_points, ends_dict = net_end_points(each_net, def_parser)
-        # print(end_points)
-        # for each in end_points:
-        #     print(str(each) + ': ' + str(ends_dict[each]))
-        print()
-    exit()
-    # Get pins from nets
+    # Get the end_points and ends_dict for each net
     nets = def_parser.nets
+    net_end_pts = {} # store the end points for each net
+    for each_net in nets.nets:
+        print(each_net.name)
+        end_points, ends_dict = net_end_points(each_net.name, def_parser)
+        print(end_points)
+        print(ends_dict)
+        print(net_direction(end_points, ends_dict, def_parser))
+        print()
+        net_end_pts[each_net.name] = (end_points, ends_dict)
+
+    #FIXME: interpret the direction
+
+    exit()
+
+    # Get pins from nets
     pin_dict = def_parser.pins.pin_dict
     pin_net_dict = {}
     for each_net in nets.nets:
