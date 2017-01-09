@@ -262,6 +262,8 @@ def net_end_points(net_name, def_data):
     :param def_data: data from DEF file
     :return: a dictionary of end-points
     """
+    # NOTE: This function might need serious re-work.
+
     die_area = def_data.diearea
     net_data = def_data.nets.net_dict[net_name]
     ends_dict = {} # end-points dictionary
@@ -301,8 +303,13 @@ def net_end_points(net_name, def_data):
                 new_end = False
                 for each_next in next_pts:
                     if each_next not in visited:
-                        end_points.append(each_next)
-                        new_end = True
+                        # if we see another end point, then remove it as an end-point
+                        if each_next in end_points:
+                            visited.add(each_next)
+                            end_points.remove(each_next)
+                        else:
+                            end_points.append(each_next)
+                            new_end = True
                 if not new_end:
                     end_points.append(current_end)
 
@@ -347,7 +354,7 @@ if __name__ == '__main__':
 
     # test net_end_points
     net_dict = def_parser.nets.net_dict
-    # end_points, ends_dict = net_end_points('n9_2', def_parser)
+    # end_points, ends_dict = net_end_points('n9_0', def_parser)
     # end_points, ends_dict = net_end_points('N7', def_parser)
     for each_net in net_dict:
         print(each_net)
