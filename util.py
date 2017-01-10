@@ -211,8 +211,8 @@ def inside_area(location, corners):
     x2 = corners[1][0]
     y1 = corners[0][1]
     y2 = corners[1][1]
-    return (location[0] > x1 and location[0] < x2
-            and location[1] > y1 and location[1] < y2)
+    return (location[0] >= x1 and location[0] <= x2
+            and location[1] >= y1 and location[1] <= y2)
 
 
 def relocate_area(left_pt, corners):

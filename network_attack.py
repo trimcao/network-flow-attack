@@ -10,6 +10,7 @@ import networkx as nx
 # from networkx.algorithms.flow import max_flow_min_cost
 import argparse
 
+
 def get_done_sinks(sink_pins, pin_net_dict):
     """
     Find all the sink pins that are already connected.a
@@ -111,7 +112,7 @@ def get_pins_cell(cell, def_data, lef_data):
 
 
 def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
-                    pin_net_dict, connected_dict):
+                    pin_net_dict, connected_dict, net_ends_dict, def_data):
     """
     Build the distance table for every pair of pins.
     A distance of -1 means there is no possible connection between those pins.
@@ -119,6 +120,9 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
     :param sink_pins: the sink pins.
     :param primary_inputs: the primary input pins.
     :param primary_outputs: the primary output pins.
+    :param pin_net_dict:
+    :param connected_dict:
+    :param net_ends_dict: dictionary that store the end points of each net.
     :return: a 2D table of distance values.
     """
     # default value = 1
@@ -138,6 +142,7 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
         # find the distance through different cases.
         for j in range(len(sink_pins)):
             sink_net = pin_net_dict[sink_pins[j]]
+            # find the direction of sink_net
             if sink_pins[j] in done_sinks:
                 # case 1: if the current sink pin is already connected.
                 distances[i][j] = -1
@@ -151,11 +156,17 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
                 # case 3: no loop, and one output pin can only connect to one
                 # input pin per gate.
                 distances[i][j] = -1
+            elif not dangling_net(source_net, sink_net, net_ends_dict, def_data):
+                # case 4: dangling wire
+                distances[i][j] = -1
             else:
                 # find the actual distance between pins
                 # indeed, it's the distance between the nets that connected to
                 # those pins.
+                # re-write distance_two_nets
                 distances[i][j] = distance_two_nets(source_net, sink_net)
+            # print(source_pins[i], sink_pins[j], distances[i][j])
+        print()
 
     # print(distances)
     # print(distances[-2])
@@ -195,6 +206,7 @@ def output_verilog(connections, def_data, lef_data, verilog_file):
         netlist[each_pin] = net_name
         for each_connect in connections[each_pin]:
             netlist[each_connect] = net_name
+    # print(netlist)
     # write cells in verilog format
     cell_dict = def_data.components.comp_dict
     cells = []
@@ -313,6 +325,11 @@ def net_end_points(net_name, def_data):
     return end_points, ends_dict
 
 
+def get_net_direction(net_name, def_data):
+    end_points, ends_dict = net_end_points(net_name, def_data)
+    return net_direction(end_points, ends_dict, def_data)
+
+
 def net_direction(end_points, ends_dict, def_data):
     """
     Find the directions that accept connection for a net (which may consist
@@ -333,7 +350,6 @@ def net_direction(end_points, ends_dict, def_data):
         for each_end in end_points:
             areas.append(wire_direction(each_end, ends_dict, die_area))
         return areas
-
 
 
 def wire_direction(end_point, ends_dict, die_area):
@@ -358,15 +374,15 @@ def wire_direction(end_point, ends_dict, die_area):
         diff_x = each_pt[0] - end_point[0]
         diff_y = each_pt[1] - end_point[1]
         if diff_x < 0:
-            x1 = min_x
-            x2 = end_point[0]
+            x1 = end_point[0]
+            x2 = max_x
         elif diff_x == 0:
             # make no difference to the possible direction
             x1 = min_x
             x2 = max_x
         else:
-            x1 = end_point[0]
-            x2 = max_x
+            x1 = min_x
+            x2 = end_point[0]
         # update corner of x-coordinate
         if x1 > corner1[0]:
             corner1[0] = x1
@@ -389,6 +405,38 @@ def wire_direction(end_point, ends_dict, die_area):
             corner2[1] = y2
     corners = [corner1, corner2]
     return corners
+
+
+def dangling_net(net1, net2, net_ends_dict, def_data):
+    """
+    Find out if net1 and net2 have possible connection due to their dangling
+    wires.
+    :param net1:
+    :param net2:
+    :return: True or False
+    """
+    # find the direction of net1
+    net1_ends = net_ends_dict[net1.name]
+    net1_direction = net_direction(net1_ends[0], net1_ends[1], def_data)
+    # find the direction of net2
+    net2_ends = net_ends_dict[net2.name]
+    net2_direction = net_direction(net2_ends[0], net2_ends[1], def_data)
+    # check if some end point of net1 is in net2's direction
+    # that means some end point must be within of some net2 corner pair.
+    result1 = False
+    for each_end in net1_ends[0]:
+        for each_rect in net2_direction:
+            # print(each_end)
+            # print(each_rect)
+            if inside_area(each_end, each_rect):
+                result1 = True
+    result2 = False
+    for each_end in net2_ends[0]:
+        for each_rect in net1_direction:
+            if inside_area(each_end, each_rect):
+                result2 = True
+    return result1 and result2
+
 
 
 
@@ -427,19 +475,17 @@ if __name__ == '__main__':
 
     # Get the end_points and ends_dict for each net
     nets = def_parser.nets
-    net_end_pts = {} # store the end points for each net
+    net_ends_dict = {} # store the end points for each net
     for each_net in nets.nets:
-        print(each_net.name)
+        # print(each_net.name)
         end_points, ends_dict = net_end_points(each_net.name, def_parser)
-        print(end_points)
-        print(ends_dict)
-        print(net_direction(end_points, ends_dict, def_parser))
-        print()
-        net_end_pts[each_net.name] = (end_points, ends_dict)
+        # print(end_points)
+        # print(ends_dict)
+        # print(net_direction(end_points, ends_dict, def_parser))
+        # print()
+        net_ends_dict[each_net.name] = (end_points, ends_dict)
+    # exit()
 
-    #FIXME: interpret the direction
-
-    exit()
 
     # Get pins from nets
     pin_dict = def_parser.pins.pin_dict
@@ -467,6 +513,14 @@ if __name__ == '__main__':
                     source_pins.append(current_pin)
                     output_cell_pins.add(current_pin)
 
+    # test dangling net
+    # print(pin_net_dict)
+    # pin_n2 = ('PIN', 'N2')
+    # pin_u11_a = ('U11', 'A')
+    # print(dangling_net(pin_net_dict[pin_n2], pin_net_dict[pin_u11_a], net_ends_dict,
+    #                    def_parser))
+    # exit()
+
     # find the connected dict (chain of cells):
     connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
 
@@ -474,7 +528,7 @@ if __name__ == '__main__':
     # NOTE: maybe a nested dictionary is better than a 2D list to represent
     # the distance table.
     distances = build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
-                    pin_net_dict, connected_dict)
+                    pin_net_dict, connected_dict, net_ends_dict, def_parser)
 
     # start creating a graph
     G = nx.DiGraph()
@@ -523,10 +577,10 @@ if __name__ == '__main__':
                 connections[each].append(each_sink)
 
     # print(connections)
-    # for each in connections:
-    #     print(each)
-    #     print(connections[each])
-    #     print()
+    for each in connections:
+        print(each)
+        print(connections[each])
+        print()
 
     # verilog_out = './c17_example/c17_inferred.v'
     verilog_out = args.output
