@@ -26,7 +26,7 @@ def get_done_sinks(sink_pins, pin_net_dict):
     return done_sinks
 
 
-def distance_two_nets(net1, net2):
+def distance_two_nets(net1, net2, net_ends_dict):
     """
     Get the distance between two nets.
     :param net1:
@@ -34,15 +34,9 @@ def distance_two_nets(net1, net2):
     :return: distance value
     """
     min_dist = float('inf')
-    # get all the points from the routes of each net
-    points1 = []
-    points2 = []
-    for each_route in net1.routed:
-        for each_pt in each_route.points:
-            points1.append(each_pt[:2])
-    for each_route in net2.routed:
-        for each_pt in each_route.points:
-            points2.append(each_pt[:2])
+    points1 = net_ends_dict[net1.name][0]
+    points2 = net_ends_dict[net2.name][0]
+
     # find the pair of points with minimum distance
     for i in range(len(points1)):
         for j in range(len(points2)):
@@ -164,8 +158,8 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
                 # indeed, it's the distance between the nets that connected to
                 # those pins.
                 # re-write distance_two_nets
-                distances[i][j] = distance_two_nets(source_net, sink_net)
-            # print(source_pins[i], sink_pins[j], distances[i][j])
+                distances[i][j] = distance_two_nets(source_net, sink_net, net_ends_dict)
+            print(source_pins[i], sink_pins[j], distances[i][j])
         print()
 
     # print(distances)
@@ -582,9 +576,8 @@ if __name__ == '__main__':
         print(connections[each])
         print()
 
-    # verilog_out = './c17_example/c17_inferred.v'
     verilog_out = args.output
-    output_verilog(connections, def_parser, lef_parser, verilog_out)
+    # output_verilog(connections, def_parser, lef_parser, verilog_out)
 
 
 
