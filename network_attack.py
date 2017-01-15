@@ -268,6 +268,41 @@ def net_end_points(net_name, def_data):
     :param def_data: data from DEF file
     :return: a dictionary of end-points
     """
+    top_layer = def_data.nets.get_top_layer()
+    via_split = 'via' + top_layer[-1]
+    die_area = def_data.diearea
+    net_data = def_data.nets.net_dict[net_name]
+    ends_dict = {} # end-points dictionary
+    end_points = set() # set of end_points
+    # initialize the ends_dict
+    for each_route in net_data.routed:
+        if each_route.end_via and each_route.end_via[:4] == via_split:
+            tuple_pt = tuple(each_route.end_via_loc[:2])
+            end_points.add(tuple_pt)
+        for each_pt in each_route.points:
+            # check for border (pin location)
+            # if on_border(each_pt, die_area):
+            #     end_points.add(tuple(each_pt[:2]))
+            tuple_pt = tuple(each_pt[:2])
+            # create the list in ends_dict if it does not exist
+            if tuple_pt not in ends_dict:
+                ends_dict[tuple_pt] = []
+            # add end points from the route
+            for each_end in each_route.points:
+                if each_end != each_pt:
+                    ends_dict[tuple_pt].append(tuple(each_end[:2]))
+    end_points = list(end_points)
+    return end_points, ends_dict
+
+
+def net_end_points2(net_name, def_data):
+    """
+    Find the end-points and the point leading to each end-point (so we can
+      infer the direction of the wire)
+    :param net_name: name of the net
+    :param def_data: data from DEF file
+    :return: a dictionary of end-points
+    """
     # NOTE: This function might need serious re-work.
     die_area = def_data.diearea
     net_data = def_data.nets.net_dict[net_name]
@@ -475,8 +510,12 @@ if __name__ == '__main__':
     nets = def_parser.nets
     net_ends_dict = {} # store the end points for each net
     for each_net in nets.nets:
+        # print(each_net.name)
         end_points, ends_dict = net_end_points(each_net.name, def_parser)
+        # print(end_points)
+        # print(ends_dict)
         net_ends_dict[each_net.name] = (end_points, ends_dict)
+        # print()
 
     # Get pins from nets
     pin_dict = def_parser.pins.pin_dict

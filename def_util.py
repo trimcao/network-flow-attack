@@ -304,7 +304,13 @@ class Net:
 
     def find_top_layer(self):
         # find the top metal layer among the routes.
-        pass
+        top_layer = 'metal1'
+        for each_route in self.routed:
+            if compare_metal(each_route.layer, top_layer) > 0:
+                top_layer = each_route.layer
+        self.top_layer = top_layer
+        return top_layer
+
 
     def __str__(self):
         s = ""

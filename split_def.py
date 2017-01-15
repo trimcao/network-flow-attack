@@ -297,14 +297,6 @@ def connected_cell_pin_routed(pin, route, def_data, lef_data):
     macro_name = comp.macro
     macro_data = lef_data.macro_dict[macro_name]
     pin_data = macro_data.pin_dict[pin[1]]
-    # method 1: check if the wire or via is inside the pin
-    # get the vertical lines in the polygon
-    # max_y = -1
-    # port_data = pin_data.port
-    # for each_layer in port_data.layer:
-    #     for each_shape in each_layer:
-    #         check if the via is in the shape
-            # pass
 
     # method 2: check if the wire or via is inside the cell, because I guess
     # a net usually connects only one pin of a cell.
@@ -321,18 +313,18 @@ def connected_cell_pin_routed(pin, route, def_data, lef_data):
 
 
 
-def split_net(def_data, lef_data):
+def split_net(def_data, lef_data, split_layer):
     """
     Modify the DEF data to split the net affected by split manufacturing.
     :param def_data: a DefParser instantiation.
+    :param lef_data
+    :param split_layer: the split layer, e.g. metal3.
     :return: void
     """
+    split_num = int(split_layer[-1])
+    via_split = 'via' + str(split_num - 1)
     nets = def_data.nets
     net_dict = nets.net_dict
-    # n9 = net_dict['n9']
-    # n9_routes = n9.routed
-    # for j in range(1, len(n9.routed)):
-    #     print(connected_routes(n9.routed[0], n9.routed[j]))
     new_nets = []
     new_net_dict = {}
     for each_net in nets.nets:
@@ -346,6 +338,15 @@ def split_net(def_data, lef_data):
             for each_route in each_net.routed:
                 if each_route.layer in GOOD_LAYERS:
                     new_routed.append(each_route)
+                elif each_route.end_via and each_route.end_via[:4] == via_split:
+                    # we can still see the via
+                    # we need to create a new route that has only the via
+                    a_route = Routed()
+                    a_route.layer = 'metal' + str(split_num - 1)
+                    a_route.end_via = each_route.end_via
+                    a_route.end_via_loc = each_route.end_via_loc
+                    a_route.points.append(a_route.end_via_loc)
+                    new_routed.append(a_route)
             # find the groups of connected routes
             union = [i for i in range(len(new_routed))]
             for i in range(len(new_routed) - 1):
@@ -389,11 +390,11 @@ def split_net(def_data, lef_data):
                 new_net.routed = groups[each]
                 new_nets.append(new_net)
                 new_net_dict[new_name] = new_net
+                new_net.find_top_layer()
 
     # Change the nets list in the DEF
     nets.nets = new_nets
     nets.net_dict = new_net_dict
-
 
 
 # Main Class
@@ -472,7 +473,7 @@ if __name__ == '__main__':
     def_parser = DefParser(def_file)
     def_parser.parse()
 
-    split_net(def_parser, lef_parser)
+    split_net(def_parser, lef_parser, SPLIT_LAYER)
     # exit()
 
     print("Writing data to new DEF file with path: " + OUTPUT_FILE)
