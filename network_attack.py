@@ -457,6 +457,10 @@ if __name__ == '__main__':
     def_parser = DefParser(def_file)
     def_parser.parse()
 
+    # find top metal layer
+    # print(def_parser.nets.get_top_layer())
+    # exit()
+
     # Build lists of source pins and sink pins
     # source pins = primary input pins, output cell pins
     # sink pins = primary output pins, input cell pins
@@ -471,15 +475,8 @@ if __name__ == '__main__':
     nets = def_parser.nets
     net_ends_dict = {} # store the end points for each net
     for each_net in nets.nets:
-        # print(each_net.name)
         end_points, ends_dict = net_end_points(each_net.name, def_parser)
-        # print(end_points)
-        # print(ends_dict)
-        # print(net_direction(end_points, ends_dict, def_parser))
-        # print()
         net_ends_dict[each_net.name] = (end_points, ends_dict)
-    # exit()
-
 
     # Get pins from nets
     pin_dict = def_parser.pins.pin_dict
@@ -578,7 +575,3 @@ if __name__ == '__main__':
 
     verilog_out = args.output
     # output_verilog(connections, def_parser, lef_parser, verilog_out)
-
-
-
-

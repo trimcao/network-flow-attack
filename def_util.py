@@ -213,6 +213,7 @@ class Nets:
         self.num_nets = num_nets
         self.nets = []
         self.net_dict = {}
+        self.top_metal_layer = None
 
     def parse_next(self, info):
         # remember to check for "(" before using split_parentheses
@@ -271,6 +272,22 @@ class Nets:
             s += each_net.to_def_format() + "\n"
         s += "END NETS"
         return s
+
+
+    def get_top_layer(self):
+        if self.top_metal_layer:
+            return self.top_metal_layer
+        else:
+            return self.find_top_layer()
+
+    def find_top_layer(self):
+        top_layer = 'metal1'
+        for each_net in self.nets:
+            if compare_metal(each_net.top_layer, top_layer) > 0:
+                top_layer = each_net.top_layer
+        self.top_metal_layer = top_layer
+        return top_layer
+
 
 
 class Net:
