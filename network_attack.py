@@ -49,6 +49,8 @@ def distance_two_nets(net1, net2, net_ends_dict):
 def connected_comps(def_data, lef_data, pin_net_dict):
     """
     Get the dictionary of connected components for each cell in the layout.
+    (that means for each cell, we store the cells that connect to the input
+    pins of that cell).
     :param def_data: DEF data
     :return: a dictionary.
     """
@@ -71,7 +73,6 @@ def connected_comps(def_data, lef_data, pin_net_dict):
 def find_cell_connected(cell, connected_dict):
     """
     Find the chain of cells (that potentially can cause a loop).
-    Recursive function.
     :param cell:
     :param connected_dict:
     :return: a set of connected cells
@@ -79,6 +80,7 @@ def find_cell_connected(cell, connected_dict):
     if cell == 'PIN':
         return set()
     connected_cells = set()
+    parent = {} # stores the parent of a node
     stack = []
     stack.append(cell)
     while len(stack) > 0:
@@ -86,9 +88,10 @@ def find_cell_connected(cell, connected_dict):
         for each_pin in connected_dict[current_cell]:
             next_cell = each_pin[0]
             if next_cell != 'PIN':
+                parent[each_pin[0]] = current_cell
                 connected_cells.add(each_pin[0])
                 stack.append(each_pin[0])
-    return connected_cells
+    return connected_cells, parent
 
 
 def get_pins_cell(cell, def_data, lef_data):
@@ -553,6 +556,10 @@ if __name__ == '__main__':
 
     # find the connected dict (chain of cells):
     connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
+    # print(connected_dict)
+    # cells, parent = find_cell_connected('U7', connected_dict)
+    # print(parent)
+    # exit()
 
     # Get the distance table between source and sink pins
     # NOTE: maybe a nested dictionary is better than a 2D list to represent
