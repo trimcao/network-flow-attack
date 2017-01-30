@@ -63,7 +63,10 @@ def connected_comps(def_data, lef_data, pin_net_dict):
             if each_input in pin_net_dict:
                 connected_net = pin_net_dict[each_input]
                 for each_pin in connected_net.comp_pin:
-                    if each_pin[0] != each_cell:
+                    # the connection must come from an output pin
+                    # here it is 'ZN'
+                    # FIXME (Jan 29): should be able to check if a pin is an OUTPUT and INPUT pin.
+                    if each_pin[0] == 'PIN' or (each_pin[0] != each_cell and each_pin[1] == 'ZN'):
                         connected[each_cell].add(tuple(each_pin))
     return connected
 
@@ -89,11 +92,15 @@ def find_cell_connected(cell, connected_dict):
                 # there is a loop
                 parent[each_pin[0]] = current_cell
                 connected_cells.add(each_pin[0])
+                # print(len(connected_cells))
                 return connected_cells, parent
             elif next_cell != 'PIN':
                 parent[each_pin[0]] = current_cell
-                connected_cells.add(each_pin[0])
-                stack.append(each_pin[0])
+                if each_pin[0] not in connected_cells:
+                    connected_cells.add(each_pin[0])
+                    # if each_pin[0] not in stack:
+                    stack.append(each_pin[0])
+    # print(len(connected_cells))
     return connected_cells, parent
 
 
@@ -454,6 +461,8 @@ def check_loop(source_pins, sink_pins, connected_dict):
 
 # Main Class
 if __name__ == '__main__':
+    log_file = './c432/c432_metal4_testrun.txt'
+    log = open(log_file, 'w')
     # inputs: LEF, DEF
     # output: Verilog
     parser = argparse.ArgumentParser(description='FEOL attack tool.')
@@ -474,10 +483,6 @@ if __name__ == '__main__':
     def_parser = DefParser(def_file)
     def_parser.parse()
 
-    # find top metal layer
-    # print(def_parser.nets.get_top_layer())
-    # exit()
-
     # Build lists of source pins and sink pins
     # source pins = primary input pins, output cell pins
     # sink pins = primary output pins, input cell pins
@@ -494,6 +499,7 @@ if __name__ == '__main__':
     for each_net in nets.nets:
         end_points, ends_dict = net_end_points(each_net.name, def_parser)
         net_ends_dict[each_net.name] = (end_points, ends_dict)
+    # print(net_ends_dict)
 
     # Get pins from nets
     pin_dict = def_parser.pins.pin_dict
@@ -521,19 +527,55 @@ if __name__ == '__main__':
                     source_pins.append(current_pin)
                     output_cell_pins.add(current_pin)
 
-    # test dangling net
     # print(pin_net_dict)
-    # pin_n2 = ('PIN', 'N2')
-    # pin_u11_a = ('U11', 'A')
-    # print(dangling_net(pin_net_dict[pin_n2], pin_net_dict[pin_u11_a], net_ends_dict,
-    #                    def_parser))
-    # exit()
+    # some primary pins do not belong to any net, need to create a net for each
+    # of them.
+    for each_pin in pin_dict:
+        pin_name = ('PIN', each_pin)
+        if pin_name not in pin_net_dict:
+            # create a new net for the pin
+            pin = pin_dict[each_pin]
+            new_name = pin.name
+            print(new_name)
+            new_net = Net(new_name)
+            new_net.comp_pin = [['PIN', new_name]]
+            new_route = Routed()
+            new_route.layer = pin.layer.name
+            new_route.points.append(pin.placed)
+            new_net.routed.append(new_route)
+            new_net.find_top_layer()
+            def_parser.nets.nets.append(new_net)
+            def_parser.nets.net_dict[new_name] = new_net
+            # print(new_net)
+            # update net_ends_dict
+            end_points = [tuple(pin.placed)]
+            ends_dict = {tuple(pin.placed): end_points}
+            net_ends_dict[new_name] = (end_points, ends_dict)
+            # print(net_ends_dict[new_name])
+            # update pin_net_dict
+            pin_net_dict[pin_name] = new_net
+            # add the pin to primary inputs or outputs
+            if pin.direction == 'INPUT':
+                source_pins.append(pin_name)
+                primary_inputs.add(pin_name)
+            elif pin.direction == 'OUTPUT':
+                sink_pins.append(pin_name)
+                primary_outputs.add(pin_name)
 
     # find the connected dict (chain of cells):
     connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
-    # print(connected_dict)
-    # cells, parent = find_cell_connected('U7', connected_dict)
+    print(connected_dict)
+    # test find_cell_connected for U181 in c432 (loop forever bug)
+    # print(connected_dict['U181'])
+    # print(connected_dict['U195'])
+    # print(connected_dict['U177'])
+    # cells, parent = find_cell_connected('U181', connected_dict)
     # print(parent)
+    # print(connected_dict['U145'])
+    # print(connected_dict['U199'])
+    # loops = check_loop(source_pins, sink_pins, connected_dict)
+    # for each in loops:
+    #     print(each)
     # exit()
 
     # Get the distance table between source and sink pins
@@ -555,7 +597,7 @@ if __name__ == '__main__':
     # add edges from the super source pin to other source pins.
     source_name = 'source'
     # NOTE: need to find the actual load capacitance later
-    SOURCE_CAP = 10
+    SOURCE_CAP = 100000
     for i in range(len(source_pins)):
         G.add_edge(source_name, source_pins[i], weight=0, capacity=SOURCE_CAP)
     # add edges from the sink pins to super sink
@@ -589,10 +631,10 @@ if __name__ == '__main__':
                 connections[each].append(each_sink)
 
     # print(connections)
-    # for each in connections:
-    #     print(each)
-    #     print(connections[each])
-    #     print()
+    for each in connections:
+        print(each)
+        print(connections[each])
+        print()
     #
     # print(connected_dict)
     # print(connections)
@@ -600,6 +642,8 @@ if __name__ == '__main__':
     # build new_connected_dict
     new_connected_dict = {}
     for each_in in connections:
+        if each_in[0] != 'PIN':
+            new_connected_dict[each_in[0]] = set()
         for each_out in connections[each_in]:
             if each_out[0] != 'PIN':
                 if each_out[0] not in new_connected_dict:
@@ -611,8 +655,13 @@ if __name__ == '__main__':
     # new_connected_dict['U8'].add(('U7', 'ZN'))
     # new_connected_dict['U9'].add(('U7', 'ZN'))
     # new_connected_dict['U12'].add(('U9', 'ZN'))
-    print(new_connected_dict)
-    print(check_loop(source_pins, sink_pins, new_connected_dict))
+    # print(new_connected_dict)
+    loops = check_loop(source_pins, sink_pins, new_connected_dict)
+    print(loops)
+    # for each in loops:
+    #     print(each)
+
+    log.close()
 
     verilog_out = args.output
-    # output_verilog(connections, def_parser, lef_parser, verilog_out)
+    output_verilog(connections, def_parser, lef_parser, verilog_out)

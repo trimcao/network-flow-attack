@@ -150,14 +150,16 @@ def output_pin(pin, def_info):
     :param def_info: DEF data
     :return: a string that contains a Pin in DEF format.
     """
-    # print (pin.get_layer())
+    # Note: all pins are available to the attacker.
+    # return pin.to_def_format()
     if pin.get_metal_layer() in GOOD_LAYERS:
         return pin.to_def_format()
     else:
-        s = ""
-        s += "- " + pin.name + " + NET " + pin.net
-        s += " + DIRECTION " + pin.direction + " + USE " + pin.use + "\n ;"
-        return s
+        return pin.to_def_format()
+    #     s = ""
+    #     s += "- " + pin.name + " + NET " + pin.net
+    #     s += " + DIRECTION " + pin.direction + " + USE " + pin.use + "\n ;"
+    #     return s
 
 
 def output_pins(pins, def_info):
@@ -174,9 +176,9 @@ def output_pins(pins, def_info):
         pin_data = output_pin(each_pin, def_info)
         pins_string += pin_data
         pins_string += "\n"
-        # only count the pin that has proper metal layer
-        if each_pin.get_metal_layer() in GOOD_LAYERS:
-            num_pins += 1
+        # all pins are observable by the attacker
+        # if each_pin.get_metal_layer() in GOOD_LAYERS:
+        num_pins += 1
     # only write PINS section when we have > 0 pins
     s = "PINS " + str(num_pins) + " ;\n"
     s += pins_string
@@ -312,7 +314,6 @@ def connected_cell_pin_routed(pin, route, def_data, lef_data):
         return False
 
 
-
 def split_net(def_data, lef_data, split_layer):
     """
     Modify the DEF data to split the net affected by split manufacturing.
@@ -353,7 +354,7 @@ def split_net(def_data, lef_data, split_layer):
                 for j in range(i + 1, len(new_routed)):
                     if connected_routes(new_routed[i], new_routed[j]):
                         union[j] = union[i]
-            print(each_net.name)
+            # print(each_net.name)
             # print(union)
             groups = {}
             for i in range(len(new_routed)):
@@ -361,7 +362,7 @@ def split_net(def_data, lef_data, split_layer):
                     groups[union[i]] = [new_routed[i]]
                 else:
                     groups[union[i]].append(new_routed[i])
-            print(len(groups))
+            # print(len(groups))
             # now find the comp/pin for each union
             comp_pin = each_net.comp_pin
             comp_pin_groups = {}
@@ -379,7 +380,7 @@ def split_net(def_data, lef_data, split_layer):
                             if connected_cell_pin_routed(each_comp_pin, each_route, def_data, lef_data):
                                 if not each_comp_pin in comp_pin_groups[each]:
                                     comp_pin_groups[each].append(each_comp_pin)
-                print(comp_pin_groups[each])
+                # print(comp_pin_groups[each])
 
             # Now create new nets
             net_name = each_net.name
@@ -387,7 +388,9 @@ def split_net(def_data, lef_data, split_layer):
                 new_name = net_name + '_' + str(each)
                 new_net = Net(new_name)
                 new_net.comp_pin = comp_pin_groups[each]
+                # print(new_net.comp_pin)
                 new_net.routed = groups[each]
+                # print(new_net.routed)
                 new_nets.append(new_net)
                 new_net_dict[new_name] = new_net
                 new_net.find_top_layer()
