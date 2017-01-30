@@ -60,10 +60,8 @@ def connected_comps(def_data, lef_data, pin_net_dict):
         inputs, outputs = get_pins_cell(each_cell, def_data, lef_data)
         connected[each_cell] = set()
         for each_input in inputs:
-            # print(each_input)
             if each_input in pin_net_dict:
                 connected_net = pin_net_dict[each_input]
-                # print(connected_net)
                 for each_pin in connected_net.comp_pin:
                     if each_pin[0] != each_cell:
                         connected[each_cell].add(tuple(each_pin))
@@ -78,7 +76,7 @@ def find_cell_connected(cell, connected_dict):
     :return: a set of connected cells
     """
     if cell == 'PIN':
-        return set()
+        return set(), None
     connected_cells = set()
     parent = {} # stores the parent of a node
     stack = []
@@ -87,7 +85,12 @@ def find_cell_connected(cell, connected_dict):
         current_cell = stack.pop()
         for each_pin in connected_dict[current_cell]:
             next_cell = each_pin[0]
-            if next_cell != 'PIN':
+            if next_cell == cell:
+                # there is a loop
+                parent[each_pin[0]] = current_cell
+                connected_cells.add(each_pin[0])
+                return connected_cells, parent
+            elif next_cell != 'PIN':
                 parent[each_pin[0]] = current_cell
                 connected_cells.add(each_pin[0])
                 stack.append(each_pin[0])
@@ -124,8 +127,6 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
     """
     # default value = 1
     distances = [[1 for i in range(len(sink_pins))] for j in range(len(source_pins))]
-    # print(len(source_pins))
-    # print(len(sink_pins))
     done_sinks = get_done_sinks(sink_pins, pin_net_dict)
     for i in range(len(source_pins)):
         # build the set of connected pins
@@ -135,7 +136,8 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
         for each_pin in source_net.comp_pin:
             connected_comps.add(each_pin[0])
         # find the connected cells in the chain (so no loop)
-        connected_comps = connected_comps ^ find_cell_connected(source_cell, connected_dict)
+        chained_cells, parent_dict = find_cell_connected(source_cell, connected_dict)
+        connected_comps = connected_comps ^ chained_cells
         # find the distance through different cases.
         for j in range(len(sink_pins)):
             sink_net = pin_net_dict[sink_pins[j]]
@@ -162,11 +164,8 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
                 # those pins.
                 # re-write distance_two_nets
                 distances[i][j] = distance_two_nets(source_net, sink_net, net_ends_dict)
-            print(source_pins[i], sink_pins[j], distances[i][j])
-        print()
-
-    # print(distances)
-    # print(distances[-2])
+            # print(source_pins[i], sink_pins[j], distances[i][j])
+        # print()
     return distances
 
 
@@ -203,7 +202,6 @@ def output_verilog(connections, def_data, lef_data, verilog_file):
         netlist[each_pin] = net_name
         for each_connect in connections[each_pin]:
             netlist[each_connect] = net_name
-    # print(netlist)
     # write cells in verilog format
     cell_dict = def_data.components.comp_dict
     cells = []
@@ -295,65 +293,6 @@ def net_end_points(net_name, def_data):
                 if each_end != each_pt:
                     ends_dict[tuple_pt].append(tuple(each_end[:2]))
     end_points = list(end_points)
-    return end_points, ends_dict
-
-
-def net_end_points2(net_name, def_data):
-    """
-    Find the end-points and the point leading to each end-point (so we can
-      infer the direction of the wire)
-    :param net_name: name of the net
-    :param def_data: data from DEF file
-    :return: a dictionary of end-points
-    """
-    # NOTE: This function might need serious re-work.
-    die_area = def_data.diearea
-    net_data = def_data.nets.net_dict[net_name]
-    ends_dict = {} # end-points dictionary
-    end_points = set() # set of end_points
-    # initialize the ends_dict
-    for each_route in net_data.routed:
-        if each_route.end_via and each_route.end_via[:4] == 'via1':
-            end_points.add(tuple(each_route.end_via_loc[:2]))
-        for each_pt in each_route.points:
-            # check for border (pin location)
-            if on_border(each_pt, die_area):
-                end_points.add(tuple(each_pt[:2]))
-            tuple_pt = tuple(each_pt[:2])
-            # create the list in ends_dict if it does not exist
-            if tuple_pt not in ends_dict:
-                ends_dict[tuple_pt] = []
-            # add end points from the route
-            for each_end in each_route.points:
-                if each_end != each_pt:
-                    ends_dict[tuple_pt].append(tuple(each_end[:2]))
-    # consider end_points as a stack
-    end_points = list(end_points)
-    # visited points
-    visited = set()
-    # follow the end points
-    num_points = len(ends_dict)
-    while len(visited) < num_points and len(end_points) > 0:
-        # cont = False
-        current_end = end_points.pop()
-        if current_end not in visited:
-            visited.add(current_end)
-            next_pts = ends_dict[current_end]
-            if len(next_pts) == 0:
-                end_points.append(current_end)
-            else:
-                new_end = False
-                for each_next in next_pts:
-                    if each_next not in visited:
-                        # if we see another end point, then remove it as an end-point
-                        if each_next in end_points:
-                            visited.add(each_next)
-                            end_points.remove(each_next)
-                        else:
-                            end_points.append(each_next)
-                            new_end = True
-                if not new_end:
-                    end_points.append(current_end)
     return end_points, ends_dict
 
 
@@ -458,8 +397,6 @@ def dangling_net(net1, net2, net_ends_dict, def_data):
     result1 = False
     for each_end in net1_ends[0]:
         for each_rect in net2_direction:
-            # print(each_end)
-            # print(each_rect)
             if inside_area(each_end, each_rect):
                 result1 = True
     result2 = False
@@ -469,6 +406,48 @@ def dangling_net(net1, net2, net_ends_dict, def_data):
                 result2 = True
     return result1 and result2
 
+
+def check_loop(source_pins, sink_pins, connected_dict):
+    """
+    Find loops in the inferred netlist (connected_dict).
+    Output a dict of cell loops?
+    :param source_pins:
+    :param sink_pins:
+    :param connected_dict:
+    :return:
+    """
+    loops = set()
+    for each_source in source_pins:
+        source_cell = each_source[0]
+        chained_cells, parent_dict = find_cell_connected(source_cell, connected_dict)
+        if source_cell in chained_cells:
+            # there is a loop
+            # start traversing from the source_cell to find the connect that
+            # causes the loop
+            visited = set()
+            current_cell = source_cell
+            visited.add(current_cell)
+            next_cell = parent_dict[current_cell]
+            while next_cell not in visited:
+                visited.add(next_cell)
+                current_cell = next_cell
+                next_cell = parent_dict[current_cell]
+            # print(current_cell)
+            # print(next_cell)
+            # now we got the loop connection, start from the current_cell to get
+            # the loop
+            loop = set()
+            loop.add(current_cell)
+            next_cell = parent_dict[current_cell]
+            while next_cell not in loop:
+                loop.add(next_cell)
+                current_cell = next_cell
+                next_cell = parent_dict[current_cell]
+            loop = list(loop)
+            # sort the loop based on cell name
+            loop.sort()
+            loops.add(tuple(loop))
+    return loops
 
 
 
@@ -513,12 +492,8 @@ if __name__ == '__main__':
     nets = def_parser.nets
     net_ends_dict = {} # store the end points for each net
     for each_net in nets.nets:
-        # print(each_net.name)
         end_points, ends_dict = net_end_points(each_net.name, def_parser)
-        # print(end_points)
-        # print(ends_dict)
         net_ends_dict[each_net.name] = (end_points, ends_dict)
-        # print()
 
     # Get pins from nets
     pin_dict = def_parser.pins.pin_dict
@@ -614,10 +589,30 @@ if __name__ == '__main__':
                 connections[each].append(each_sink)
 
     # print(connections)
-    for each in connections:
-        print(each)
-        print(connections[each])
-        print()
+    # for each in connections:
+    #     print(each)
+    #     print(connections[each])
+    #     print()
+    #
+    # print(connected_dict)
+    # print(connections)
+
+    # build new_connected_dict
+    new_connected_dict = {}
+    for each_in in connections:
+        for each_out in connections[each_in]:
+            if each_out[0] != 'PIN':
+                if each_out[0] not in new_connected_dict:
+                    new_connected_dict[each_out[0]] = set()
+                new_connected_dict[each_out[0]].add(each_in)
+
+    print(new_connected_dict)
+    # add one loop
+    # new_connected_dict['U8'].add(('U7', 'ZN'))
+    # new_connected_dict['U9'].add(('U7', 'ZN'))
+    # new_connected_dict['U12'].add(('U9', 'ZN'))
+    print(new_connected_dict)
+    print(check_loop(source_pins, sink_pins, new_connected_dict))
 
     verilog_out = args.output
     # output_verilog(connections, def_parser, lef_parser, verilog_out)
