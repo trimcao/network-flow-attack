@@ -11,18 +11,23 @@ import networkx as nx
 import argparse
 
 
-def get_done_sinks(sink_pins, pin_net_dict):
+def get_done_sinks(sink_pins, source_pins, pin_net_dict):
     """
     Find all the sink pins that are already connected.a
     :param sink_pins: a list of sink pins.
+    :param source_pins
     :param pin_net_dict: pin to net dictionary (mapping).
     :return: a set of connected sink pins
     """
     done_sinks = set()
     for each_pin in sink_pins:
         net = pin_net_dict[each_pin]
-        if len(net.comp_pin) > 1:
-            done_sinks.add(each_pin)
+        # a done sink has a connection to an source pin
+        for each_comp_pin in net.comp_pin:
+            if tuple(each_comp_pin) in source_pins:
+                done_sinks.add(each_pin)
+        # if len(net.comp_pin) > 1:
+        #     done_sinks.add(each_pin)
     return done_sinks
 
 
@@ -134,7 +139,7 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
     """
     # default value = 1
     distances = [[1 for i in range(len(sink_pins))] for j in range(len(source_pins))]
-    done_sinks = get_done_sinks(sink_pins, pin_net_dict)
+    done_sinks = get_done_sinks(sink_pins, source_pins, pin_net_dict)
     for i in range(len(source_pins)):
         # build the set of connected pins
         connected_comps = set()

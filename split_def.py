@@ -360,23 +360,16 @@ def split_net(def_data, lef_data, split_layer):
                         for k in range(len(union)):
                             if union[k] == temp:
                                 union[k] = union[i]
-                # if each_net.name == 'N37':
-                #     print(union)
-            # print(each_net.name)
-            # print(union)
             groups = {}
             for i in range(len(new_routed)):
                 if union[i] not in groups:
                     groups[union[i]] = [new_routed[i]]
                 else:
                     groups[union[i]].append(new_routed[i])
-            # print(len(groups))
-            # if each_net.name == 'N37':
-            #     for each_route in new_routed:
-            #         print(each_route)
-            #     print(len(groups))
-            #     print(union)
-            #     print(groups)
+
+            if each_net.name == 'N102':
+                print(union)
+                print(groups)
 
             # now find the comp/pin for each union
             comp_pin = each_net.comp_pin
