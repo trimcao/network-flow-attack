@@ -59,6 +59,7 @@ def connected_comps(def_data, lef_data, pin_net_dict):
     :param def_data: DEF data
     :return: a dictionary.
     """
+    pin_dict = def_data.pins.pin_dict
     connected = {}
     cell_dict = def_data.components.comp_dict
     for each_cell in cell_dict:
@@ -68,11 +69,13 @@ def connected_comps(def_data, lef_data, pin_net_dict):
             if each_input in pin_net_dict:
                 connected_net = pin_net_dict[each_input]
                 for each_pin in connected_net.comp_pin:
-                    # the connection must come from an output pin
-                    # here it is 'ZN'
-                    # FIXME (Jan 29): should be able to check if a pin is an OUTPUT and INPUT pin.
-                    if each_pin[0] == 'PIN' or (each_pin[0] != each_cell and each_pin[1] == 'ZN'):
+                    # the connection must come from an output pin (source pin)
+                    if each_pin[0] == 'PIN':
                         connected[each_cell].add(tuple(each_pin))
+                    elif each_pin[0] != each_cell:
+                        target_ins, target_outs = get_pins_cell(each_pin[0], def_data, lef_data)
+                        if each_pin in target_outs:
+                            connected[each_cell].add(tuple(each_pin))
     return connected
 
 
@@ -150,8 +153,6 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
         # find the connected cells in the chain (so no loop)
         chained_cells, parent_dict = find_cell_connected(source_cell, connected_dict)
         connected_comps = connected_comps ^ chained_cells
-        if source_cell == 'U204':
-            print(connected_comps)
         # find the distance through different cases.
         for j in range(len(sink_pins)):
             sink_net = pin_net_dict[sink_pins[j]]
@@ -159,31 +160,30 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
             if sink_pins[j] in done_sinks:
                 # case 1: if the current sink pin is already connected.
                 distances[i][j] = -1
-                log.write('case 1' + '\n')
+                # log.write('case 1' + '\n')
                 for each_pin in sink_net.comp_pin:
                     if tuple(each_pin) == source_pins[i]:
                         distances[i][j] = 0
             elif source_pins[i] in primary_inputs and sink_pins[j] in primary_outputs:
                 # case 2: primary input cannot connect to primary output
                 distances[i][j] = -1
-                log.write('case 2' + '\n')
+                # log.write('case 2' + '\n')
             elif sink_pins[j][0] in connected_comps:
                 # case 3: no loop, and one output pin can only connect to one
                 # input pin per gate.
                 distances[i][j] = -1
-                log.write('case 3' + '\n')
+                # log.write('case 3' + '\n')
             elif not dangling_net(source_net, sink_net, net_ends_dict, def_data):
                 # case 4: dangling wire
                 distances[i][j] = -1
-                log.write('case 4' + '\n')
+                # log.write('case 4' + '\n')
             else:
                 # find the actual distance between pins
                 # indeed, it's the distance between the nets that connected to
                 # those pins.
-                # re-write distance_two_nets
                 distances[i][j] = distance_two_nets(source_net, sink_net, net_ends_dict)
-            log.write(str(source_pins[i]) + ' ' + str(sink_pins[j]) + ' ' + str(distances[i][j]) + '\n')
-        log.write('\n')
+            # log.write(str(source_pins[i]) + ' ' + str(sink_pins[j]) + ' ' + str(distances[i][j]) + '\n')
+        # log.write('\n')
     return distances
 
 
@@ -300,8 +300,6 @@ def net_end_points(net_name, def_data):
             end_points.add(tuple_pt)
         for each_pt in each_route.points:
             # check for border (pin location)
-            # if on_border(each_pt, die_area):
-            #     end_points.add(tuple(each_pt[:2]))
             tuple_pt = tuple(each_pt[:2])
             # create the list in ends_dict if it does not exist
             if tuple_pt not in ends_dict:
@@ -450,8 +448,6 @@ def check_loop(source_pins, sink_pins, connected_dict):
                 visited.add(next_cell)
                 current_cell = next_cell
                 next_cell = parent_dict[current_cell]
-            # print(current_cell)
-            # print(next_cell)
             # now we got the loop connection, start from the current_cell to get
             # the loop
             loop = set()
@@ -468,12 +464,10 @@ def check_loop(source_pins, sink_pins, connected_dict):
     return loops
 
 
-
-
 # Main Class
 if __name__ == '__main__':
-    log_file = './c432/c432_metal4_testrun.txt'
-    log = open(log_file, 'w')
+    # log_file = './c432/c432_metal4_testrun.txt'
+    # log = open(log_file, 'w')
     # inputs: LEF, DEF
     # output: Verilog
     parser = argparse.ArgumentParser(description='FEOL attack tool.')
@@ -510,7 +504,6 @@ if __name__ == '__main__':
     for each_net in nets.nets:
         end_points, ends_dict = net_end_points(each_net.name, def_parser)
         net_ends_dict[each_net.name] = (end_points, ends_dict)
-    # print(net_ends_dict)
 
     # Get pins from nets
     pin_dict = def_parser.pins.pin_dict
@@ -538,7 +531,6 @@ if __name__ == '__main__':
                     source_pins.append(current_pin)
                     output_cell_pins.add(current_pin)
 
-    # print(pin_net_dict)
     # some primary pins do not belong to any net, need to create a net for each
     # of them.
     for each_pin in pin_dict:
@@ -573,25 +565,9 @@ if __name__ == '__main__':
                 sink_pins.append(pin_name)
                 primary_outputs.add(pin_name)
 
-    # print(pin_net_dict[('U154', 'A2')])
-    # exit()
-
     # find the connected dict (chain of cells):
     connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
-    print(connected_dict)
-    # test find_cell_connected for U181 in c432 (loop forever bug)
-    # print(connected_dict['U181'])
-    # print(connected_dict['U195'])
-    # print(connected_dict['U177'])
-    # cells, parent = find_cell_connected('U181', connected_dict)
-    # print(parent)
-    # print(connected_dict['U145'])
-    # print(connected_dict['U199'])
-    # loops = check_loop(source_pins, sink_pins, connected_dict)
-    # for each in loops:
-    #     print(each)
-    # exit()
-
+    # print(connected_dict)
     # Get the distance table between source and sink pins
     # NOTE: maybe a nested dictionary is better than a 2D list to represent
     # the distance table.
@@ -622,14 +598,6 @@ if __name__ == '__main__':
     for i in range(len(sink_pins)):
         G.add_edge(sink_pins[i], sink_name, weight=0, capacity=SINK_CAP)
 
-    # print(G.nodes())
-    # print(G.edges())
-    # print()
-    # for each in G.nodes():
-    #     print(each)
-    #     print(G[each])
-    #     print()
-
     mincostFlow = nx.max_flow_min_cost(G, source_name, sink_name)
     mincost = nx.cost_of_flow(G, mincostFlow)
     # print(mincostFlow)
@@ -643,16 +611,11 @@ if __name__ == '__main__':
         for each_sink in mincostFlow[each]:
             if mincostFlow[each][each_sink] > 0:
                 connections[each].append(each_sink)
-
-    # print(connections)
-    print()
-    for each in connections:
-        print(each)
-        print(connections[each])
-        print()
-    #
-    # print(connected_dict)
-    # print(connections)
+    # print()
+    # for each in connections:
+    #     print(each)
+    #     print(connections[each])
+    #     print()
 
     # build new_connected_dict
     new_connected_dict = {}
@@ -665,18 +628,12 @@ if __name__ == '__main__':
                     new_connected_dict[each_out[0]] = set()
                 new_connected_dict[each_out[0]].add(each_in)
 
-    print(new_connected_dict)
-    # add one loop
-    # new_connected_dict['U8'].add(('U7', 'ZN'))
-    # new_connected_dict['U9'].add(('U7', 'ZN'))
-    # new_connected_dict['U12'].add(('U9', 'ZN'))
     # print(new_connected_dict)
     loops = check_loop(source_pins, sink_pins, new_connected_dict)
-    print(loops)
-    # for each in loops:
-    #     print(each)
-
-    log.close()
+    # print(loops)
+    # log.close()
 
     verilog_out = args.output
     output_verilog(connections, def_parser, lef_parser, verilog_out)
+
+    print('Writing inferred netlist to Verilog output done.')
