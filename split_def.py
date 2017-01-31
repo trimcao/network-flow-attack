@@ -6,6 +6,7 @@ Date: August 2016
 """
 from def_parser import *
 from lef_parser import *
+from util import *
 
 
 def proper_layers(back_end, front_end, split_layer):
@@ -353,7 +354,14 @@ def split_net(def_data, lef_data, split_layer):
             for i in range(len(new_routed) - 1):
                 for j in range(i + 1, len(new_routed)):
                     if connected_routes(new_routed[i], new_routed[j]):
-                        union[j] = union[i]
+                        # need to change the union of all routes that has the
+                        # value of union[j]
+                        temp = union[j]
+                        for k in range(len(union)):
+                            if union[k] == temp:
+                                union[k] = union[i]
+                # if each_net.name == 'N37':
+                #     print(union)
             # print(each_net.name)
             # print(union)
             groups = {}
@@ -363,6 +371,13 @@ def split_net(def_data, lef_data, split_layer):
                 else:
                     groups[union[i]].append(new_routed[i])
             # print(len(groups))
+            # if each_net.name == 'N37':
+            #     for each_route in new_routed:
+            #         print(each_route)
+            #     print(len(groups))
+            #     print(union)
+            #     print(groups)
+
             # now find the comp/pin for each union
             comp_pin = each_net.comp_pin
             comp_pin_groups = {}

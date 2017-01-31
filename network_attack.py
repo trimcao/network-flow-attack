@@ -145,6 +145,8 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
         # find the connected cells in the chain (so no loop)
         chained_cells, parent_dict = find_cell_connected(source_cell, connected_dict)
         connected_comps = connected_comps ^ chained_cells
+        if source_cell == 'U204':
+            print(connected_comps)
         # find the distance through different cases.
         for j in range(len(sink_pins)):
             sink_net = pin_net_dict[sink_pins[j]]
@@ -152,27 +154,31 @@ def build_distances(source_pins, sink_pins, primary_inputs, primary_outputs,
             if sink_pins[j] in done_sinks:
                 # case 1: if the current sink pin is already connected.
                 distances[i][j] = -1
+                log.write('case 1' + '\n')
                 for each_pin in sink_net.comp_pin:
                     if tuple(each_pin) == source_pins[i]:
                         distances[i][j] = 0
             elif source_pins[i] in primary_inputs and sink_pins[j] in primary_outputs:
                 # case 2: primary input cannot connect to primary output
                 distances[i][j] = -1
+                log.write('case 2' + '\n')
             elif sink_pins[j][0] in connected_comps:
                 # case 3: no loop, and one output pin can only connect to one
                 # input pin per gate.
                 distances[i][j] = -1
+                log.write('case 3' + '\n')
             elif not dangling_net(source_net, sink_net, net_ends_dict, def_data):
                 # case 4: dangling wire
                 distances[i][j] = -1
+                log.write('case 4' + '\n')
             else:
                 # find the actual distance between pins
                 # indeed, it's the distance between the nets that connected to
                 # those pins.
                 # re-write distance_two_nets
                 distances[i][j] = distance_two_nets(source_net, sink_net, net_ends_dict)
-            # print(source_pins[i], sink_pins[j], distances[i][j])
-        # print()
+            log.write(str(source_pins[i]) + ' ' + str(sink_pins[j]) + ' ' + str(distances[i][j]) + '\n')
+        log.write('\n')
     return distances
 
 
@@ -536,7 +542,7 @@ if __name__ == '__main__':
             # create a new net for the pin
             pin = pin_dict[each_pin]
             new_name = pin.name
-            print(new_name)
+            # print(new_name)
             new_net = Net(new_name)
             new_net.comp_pin = [['PIN', new_name]]
             new_route = Routed()
@@ -561,6 +567,9 @@ if __name__ == '__main__':
             elif pin.direction == 'OUTPUT':
                 sink_pins.append(pin_name)
                 primary_outputs.add(pin_name)
+
+    # print(pin_net_dict[('U154', 'A2')])
+    # exit()
 
     # find the connected dict (chain of cells):
     connected_dict = connected_comps(def_parser, lef_parser, pin_net_dict)
@@ -631,6 +640,7 @@ if __name__ == '__main__':
                 connections[each].append(each_sink)
 
     # print(connections)
+    print()
     for each in connections:
         print(each)
         print(connections[each])

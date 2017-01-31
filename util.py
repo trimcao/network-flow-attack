@@ -395,6 +395,8 @@ def sorted_components(layout_area, row_height, comps):
 def connected_routes(route1, route2):
     """
     check if two routes are connected.
+    NOTE: only consider the first two coordinates in a point, i.e. only
+    consider (x, y) from a point (x, y, z)
     :param route1: route 1
     :param route2: route 2
     :return: True or False
@@ -402,7 +404,7 @@ def connected_routes(route1, route2):
     result = False
     for each_pt1 in route1.points:
         for each_pt2 in route2.points:
-            if each_pt1 == each_pt2:
+            if each_pt1[:2] == each_pt2[:2]:
                 return True
     return result
 
