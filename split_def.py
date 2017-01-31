@@ -306,13 +306,10 @@ def connected_cell_pin_routed(pin, route, def_data, lef_data):
     macro_size = macro_data.size
     cell_loc = comp.placed
     corners = [cell_loc, [cell_loc[0] + macro_size[0] * SCALE, cell_loc[1] + macro_size[1] * SCALE]]
-    if end_via:
-        return inside_area(end_via_loc, corners)
-    else:
-        for each_pt in route.points:
-            if inside_area(each_pt, corners):
-                return True
-        return False
+    for each_pt in route.points:
+        if inside_area(each_pt, corners):
+            return True
+    return False
 
 
 def split_net(def_data, lef_data, split_layer):
