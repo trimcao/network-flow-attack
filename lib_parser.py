@@ -20,7 +20,6 @@ class LibParser:
         self.stack = []
         self.library = None
 
-
     def parse(self):
         print ("Start parsing DEF file...")
         # open the file and start reading

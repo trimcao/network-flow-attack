@@ -5,6 +5,7 @@ Email: tricao@utdallas.edu
 Date: December 2016
 """
 
+
 class Library:
     """
     Class Library represents the library section in the LIB file.

@@ -364,10 +364,6 @@ def split_net(def_data, lef_data, split_layer):
                 else:
                     groups[union[i]].append(new_routed[i])
 
-            if each_net.name == 'N102':
-                print(union)
-                print(groups)
-
             # now find the comp/pin for each union
             comp_pin = each_net.comp_pin
             comp_pin_groups = {}
@@ -413,6 +409,7 @@ if __name__ == '__main__':
     SPLIT_LAYER = "metal2"
     OUTPUT_FILE = "./def_write/test.def"
     INPUT_FILE = "./libraries/DEF/c1908.def"
+    LEF_FILE = None
     # load last setup from split_def.ini
     print("Last setup: ")
     last_setup = open("split_def.ini", "r")
@@ -429,12 +426,16 @@ if __name__ == '__main__':
             OUTPUT_FILE = text[2]
         elif text[0] == "INPUT_FILE_NAME":
             INPUT_FILE = text[2]
+        elif text[0] == 'LEF_FILE':
+            LEF_FILE = text[2]
 
     print()
     last_setup.close()
 
     use_last_setup = input("Use last setup? (y/n): ")
     if use_last_setup == "n":
+        lef_name = input("Enter LEF file path: ")
+        LEF_FILE = lef_name
         input_name = input("Enter input DEF file path: ")
         INPUT_FILE = input_name
         # user will choose whether to keep back_end and/or front_end
@@ -455,6 +456,7 @@ if __name__ == '__main__':
         OUTPUT_FILE = output_name
         # write current settings to a file
         setup_file = open("split_def.ini", "w+")
+        setup_file.write("LEF_FILE = " + lef_name + "\n")
         setup_file.write("INPUT_FILE_NAME = " + input_name + "\n")
         setup_file.write("BACK_END = " + str(BACK_END) + "\n")
         setup_file.write("FRONT_END = " + str(FRONT_END) + "\n")
@@ -464,17 +466,13 @@ if __name__ == '__main__':
     else:
         print("The program will use the last setup listed above.")
 
-    # print (BACK_END)
-    # print (FRONT_END)
-    # print (SPLIT_LAYER)
-
     # need to know what layers are good for the current back-end and
     # front-end settings
     GOOD_LAYERS = proper_layers(BACK_END, FRONT_END, SPLIT_LAYER)
 
     print()
-    lef_file = "./c17_example/NangateOpenCellLibrary.lef"
-    lef_parser = LefParser(lef_file)
+    # lef_file = "./c17_example/NangateOpenCellLibrary.lef"
+    lef_parser = LefParser(LEF_FILE)
     lef_parser.parse()
     print()
     def_file = INPUT_FILE
@@ -482,7 +480,6 @@ if __name__ == '__main__':
     def_parser.parse()
 
     split_net(def_parser, lef_parser, SPLIT_LAYER)
-    # exit()
 
     print("Writing data to new DEF file with path: " + OUTPUT_FILE)
     out_file = open(OUTPUT_FILE, "w+")
